@@ -173,7 +173,7 @@ audioToggleBtn.addEventListener('click', () => {
   audioToggleBtn.setAttribute('aria-label', muted ? 'Activer le son' : 'Couper le son');
 });
 
-const TOTAL_UNITS = ASSETS_TO_PRELOAD.length + 1; // + le modèle 3D
+const TOTAL_UNITS = ASSETS_TO_PRELOAD.length + 1; // + le modèle 3D de la partie 2
 let loadedCount = 0;
 let glbProgress = 0;
 let glbReady = false;
@@ -193,7 +193,7 @@ function updateProgress() {
   refreshProgressBar();
 }
 
-window.onScene3DProgress = function onScene3DProgress(ratio) {
+window.onScene3DPart2Progress = function onScene3DPart2Progress(ratio) {
   glbProgress = Math.min(ratio, 1);
   refreshProgressBar();
 };
@@ -273,18 +273,18 @@ ASSETS_TO_PRELOAD.forEach((src) => {
   preloadImage(src).then(updateProgress);
 });
 
-function waitForScene3DReady() {
-  if (typeof window.onScene3DReady === 'function') {
-    window.onScene3DReady(() => {
+function waitForScene3DPart2Ready() {
+  if (typeof window.onScene3DPart2Ready === 'function') {
+    window.onScene3DPart2Ready(() => {
       glbReady = true;
       glbProgress = 1;
       refreshProgressBar();
     });
   } else {
-    setTimeout(waitForScene3DReady, 50);
+    setTimeout(waitForScene3DPart2Ready, 50);
   }
 }
-waitForScene3DReady();
+waitForScene3DPart2Ready();
 
 // Gestion de l'écran de fin de chapitre avec bouton "Dôgo kun soro"
 const endChapterScreen = document.getElementById('end-chapter-screen');

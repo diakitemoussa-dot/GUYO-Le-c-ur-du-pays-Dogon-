@@ -729,9 +729,26 @@ dracoLoader.setDecoderPath('https://unpkg.com/three@0.164.0/examples/jsm/libs/dr
 
 const loader = new GLTFLoader();
 loader.setDRACOLoader(dracoLoader);
-loader.load('asset/model/scene-partie2.glb', (gltf) => {
-  loadedGltf = gltf;
-});
+
+let part2ReadyCallback = null;
+
+window.onScene3DPart2Ready = function onScene3DPart2Ready(callback) {
+  if (loadedGltf) callback();
+  else part2ReadyCallback = callback;
+};
+
+loader.load(
+  'asset/model/scene-partie2.glb',
+  (gltf) => {
+    loadedGltf = gltf;
+    if (part2ReadyCallback) part2ReadyCallback();
+  },
+  (event) => {
+    if (window.onScene3DPart2Progress && event.total) {
+      window.onScene3DPart2Progress(event.loaded / event.total);
+    }
+  }
+);
 
 function startWhenReady() {
   if (loadedGltf) {
