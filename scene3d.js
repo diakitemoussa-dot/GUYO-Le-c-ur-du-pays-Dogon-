@@ -800,14 +800,21 @@ window.onScene3DReady = function onScene3DReady(callback) {
 function startWhenReady() {
   if (loadedGltf) {
     if (!renderer) {
-      init(loadedGltf);
+      try {
+        init(loadedGltf);
+      } catch (e) {
+        console.error('scene3d init failed:', e);
+      }
     } else {
       renderer.setAnimationLoop(applyParallaxAndRender);
     }
     initPending = false;
   } else if (!initPending) {
     initPending = true;
-    setTimeout(startWhenReady, 100);
+    setTimeout(() => {
+      initPending = false;
+      startWhenReady();
+    }, 100);
   }
 }
 

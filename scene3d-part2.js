@@ -278,6 +278,12 @@ let skyMaterial = null;
 const PLANE_HIT_RADIUS = 1.5; // unités de monde (l'avion fait ~0,34)
 const planeHitSphere = new THREE.Sphere();
 const planeHitPoint = new THREE.Vector3();
+// Le clic sur l'avion ne doit pas se déclencher deux fois pour un même passage en
+// partie 2 (le « pointerup » et le « click » synthétisé arriveraient tous les deux).
+// Mais ce garde-fou doit être réinitialisé à CHAQUE retour en partie 2 (cf.
+// setScene3DPart2Visible) : sinon, après le premier clic (qui a mené à la partie 1),
+// l'avion reste muet pour le reste de la session — seul le bouton RETOUR fonctionne.
+let planeNavigationStarted = false;
 
 function setupPlaneButton(plane, onClickCallback) {
   plane.userData.isButton = true;
@@ -291,7 +297,8 @@ function setupPlaneButton(plane, onClickCallback) {
       new THREE.Vector3().setFromMatrixPosition(plane.matrixWorld),
       PLANE_HIT_RADIUS,
     );
-    return raycaster.ray.intersectSphere(planeHitSphere, planeHitPoint) !== null;
+    const result = raycaster.ray.intersectSphere(planeHitSphere, planeHitPoint) !== null;
+    return result;
   };
 
   const onMouseMove = (event) => {
@@ -587,12 +594,12 @@ function init(gltf) {
   // Configuration du Plane comme bouton interactif pour naviguer vers la partie 1
   planeObject = gltf.scene.getObjectByName('plane');
   if (planeObject) {
-    // La transition est déclenchée une seule fois : un double tap (ou un tap + clic
-    // doublé) ne relance pas goToPart1 plusieurs fois.
-    let navigationStarted = false;
+    // La transition est déclenchée une seule fois par passage en partie 2 : un double
+    // tap (ou un tap + clic doublé) ne relance pas goToPart1 plusieurs fois. Le garde
+    // module-level est réinitialisé à chaque retour en partie 2 (setScene3DPart2Visible).
     setupPlaneButton(planeObject, () => {
-      if (navigationStarted) return;
-      navigationStarted = true;
+      if (planeNavigationStarted) return;
+      planeNavigationStarted = true;
       // Son de transition joué au clic, puis navigation vers la partie 1
       playTransitionSound();
       if (typeof window.goToPart1 === 'function') {
@@ -924,6 +931,9 @@ window.setScene3DPart2Visible = function setScene3DPart2Visible(visible) {
   revealed = visible;
   if (visible) {
     container.hidden = false;
+    // Réactiver le clic sur l'avion : chaque retour en partie 2 doit rendre l'avion
+    // de nouveau cliquable (sinon le premier clic de la session le bloque à jamais).
+    planeNavigationStarted = false;
     if (typeof window.startScene3DPart2 === 'function') window.startScene3DPart2();
     requestAnimationFrame(() => container.classList.add('visible'));
   } else {
