@@ -39,7 +39,6 @@ const mouseTarget = { x: 0, y: 0 };
 const mouseCurrent = { x: 0, y: 0 };
 const tempRight = new THREE.Vector3();
 const tempUp = new THREE.Vector3();
-const tempBoxSize = new THREE.Vector3();
 const tiltQuaternion = new THREE.Quaternion();
 const tiltEuler = new THREE.Euler();
 const tempForward = new THREE.Vector3();
@@ -47,7 +46,7 @@ let lastMoveTime = 0;
 let startTime = 0;
 
 // Cible du modèle et direction du centre vers la caméra du GLB, réutilisées pour la
-// bulle AR. frameViewDir pointe du centre du modèle vers la caméra.
+// parallaxe. frameViewDir pointe du centre du modèle vers la caméra.
 const frameCenter = new THREE.Vector3();
 const frameViewDir = new THREE.Vector3(0, 0, -1);
 let frameDistance = 1;
@@ -55,136 +54,6 @@ let parallaxScale = 1;
 
 const BIRD_COUNT = 10;
 const birds = [];
-
-let arBubble = null;
-let arBubbleBaseY = 0;
-
-function createTextBubble(text) {
-  const canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 128;
-  const ctx = canvas.getContext('2d');
-
-  // Fond blanc arrondi
-  ctx.fillStyle = '#ffffff';
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 2;
-  const radius = 10;
-  ctx.beginPath();
-  ctx.moveTo(radius, 0);
-  ctx.lineTo(canvas.width - radius, 0);
-  ctx.quadraticCurveTo(canvas.width, 0, canvas.width, radius);
-  ctx.lineTo(canvas.width, canvas.height - radius - 12);
-  ctx.quadraticCurveTo(canvas.width, canvas.height - 12, canvas.width - radius, canvas.height - 12);
-  ctx.lineTo(canvas.width * 0.6, canvas.height - 12);
-  ctx.lineTo(canvas.width * 0.55, canvas.height);
-  ctx.lineTo(canvas.width * 0.5, canvas.height - 12);
-  ctx.lineTo(radius, canvas.height - 12);
-  ctx.quadraticCurveTo(0, canvas.height - 12, 0, canvas.height - radius - 12);
-  ctx.lineTo(0, radius);
-  ctx.quadraticCurveTo(0, 0, radius, 0);
-  ctx.fill();
-  ctx.stroke();
-
-  // Texte noir, avec retour à la ligne automatique pour les phrases longues
-  ctx.fillStyle = '#000000';
-  ctx.font = 'bold 20px Arial';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-
-  const maxTextWidth = canvas.width - 24;
-  const words = text.split(' ');
-  const lines = [];
-  let currentLine = '';
-  words.forEach((word) => {
-    const testLine = currentLine ? `${currentLine} ${word}` : word;
-    if (ctx.measureText(testLine).width > maxTextWidth && currentLine) {
-      lines.push(currentLine);
-      currentLine = word;
-    } else {
-      currentLine = testLine;
-    }
-  });
-  if (currentLine) lines.push(currentLine);
-
-  const lineHeight = 22;
-  const textAreaCenterY = (canvas.height - 12) / 2;
-  const startY = textAreaCenterY - ((lines.length - 1) * lineHeight) / 2;
-  lines.forEach((line, i) => {
-    ctx.fillText(line, canvas.width / 2, startY + i * lineHeight);
-  });
-
-  const texture = new THREE.CanvasTexture(canvas);
-  const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
-  const sprite = new THREE.Sprite(spriteMaterial);
-  sprite.scale.set(3, 1.5, 1);
-  return sprite;
-}
-
-function createARTextBubble(text) {
-  const canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 128;
-  const ctx = canvas.getContext('2d');
-
-  // Dégradé chaud (orange/doré) pour différencier visiblement de la bulle standard
-  const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height - 12);
-  gradient.addColorStop(0, '#ffd89b');
-  gradient.addColorStop(1, '#ffb366');
-  ctx.fillStyle = gradient;
-  ctx.strokeStyle = '#ff8c42';
-  ctx.lineWidth = 3;
-  const radius = 10;
-  ctx.beginPath();
-  ctx.moveTo(radius, 0);
-  ctx.lineTo(canvas.width - radius, 0);
-  ctx.quadraticCurveTo(canvas.width, 0, canvas.width, radius);
-  ctx.lineTo(canvas.width, canvas.height - radius - 12);
-  ctx.quadraticCurveTo(canvas.width, canvas.height - 12, canvas.width - radius, canvas.height - 12);
-  ctx.lineTo(canvas.width * 0.6, canvas.height - 12);
-  ctx.lineTo(canvas.width * 0.55, canvas.height);
-  ctx.lineTo(canvas.width * 0.5, canvas.height - 12);
-  ctx.lineTo(radius, canvas.height - 12);
-  ctx.quadraticCurveTo(0, canvas.height - 12, 0, canvas.height - radius - 12);
-  ctx.lineTo(0, radius);
-  ctx.quadraticCurveTo(0, 0, radius, 0);
-  ctx.fill();
-  ctx.stroke();
-
-  // Texte blanc/clair (plus visible sur fond chaud)
-  ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 20px Arial';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-
-  const maxTextWidth = canvas.width - 24;
-  const words = text.split(' ');
-  const lines = [];
-  let currentLine = '';
-  words.forEach((word) => {
-    const testLine = currentLine ? `${currentLine} ${word}` : word;
-    if (ctx.measureText(testLine).width > maxTextWidth && currentLine) {
-      lines.push(currentLine);
-      currentLine = word;
-    } else {
-      currentLine = testLine;
-    }
-  });
-  if (currentLine) lines.push(currentLine);
-
-  const lineHeight = 22;
-  const textAreaCenterY = (canvas.height - 12) / 2;
-  const startY = textAreaCenterY - ((lines.length - 1) * lineHeight) / 2;
-  lines.forEach((line, i) => {
-    ctx.fillText(line, canvas.width / 2, startY + i * lineHeight);
-  });
-
-  const texture = new THREE.CanvasTexture(canvas);
-  const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
-  const sprite = new THREE.Sprite(spriteMaterial);
-  sprite.scale.set(3, 1.5, 1);
-  return sprite;
-}
 
 function wrapRange(value, range) {
   const span = range * 2;
@@ -493,15 +362,6 @@ function applyParallaxAndRender() {
 
   updateBirds((performance.now() - startTime) / 1000);
 
-  // Animation de la bulle AR : oscillation Y (flottement vertical) + rotation Z douce
-  if (arBubble) {
-    const t = (performance.now() - startTime) / 1000;
-    // Oscillation Y pour un flottement doux (±0.3 unités à 1 Hz)
-    arBubble.position.y = arBubbleBaseY + Math.sin(t * 1) * 0.3;
-    // Rotation Z subtile qui suit le mouvement
-    arBubble.rotation.z = Math.sin(t * 1) * 0.05;
-  }
-
   renderer.render(scene, camera);
 }
 
@@ -683,7 +543,7 @@ function init(gltf) {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
 
-  // Cible du modèle (centre de sa boîte englobante) pour la bulle AR et la parallaxe.
+  // Cible du modèle (centre de sa boîte englobante) pour la parallaxe.
   new THREE.Box3().setFromObject(scene).getCenter(frameCenter);
 
   frameViewDir.copy(camera.position).sub(frameCenter).normalize();
@@ -714,17 +574,6 @@ function init(gltf) {
     });
     timelineDuration = Math.max(...gltf.animations.map((clip) => clip.duration));
   }
-
-  // Créer la bulle AR avec le message d'instruction (design chaud/doré différencié).
-  // Placée entre la caméra et le village (à ~40 % de la distance de cadrage), à
-  // mi-hauteur du modèle, pour rester visible dans le nouveau cadrage.
-  arBubble = createARTextBubble("n'oublie pas que clic sur le AR pour me place dans ton monde réel");
-  scene.add(arBubble);
-  arBubble.position.copy(frameCenter)
-    .addScaledVector(frameViewDir, frameDistance * 0.4)
-    .add(tempBoxSize.set(0, 4, 0));
-  arBubbleBaseY = arBubble.position.y;
-  arBubble.scale.set(0.25, 0.25, 0.25);
 
   window.addEventListener('resize', onResize);
   window.addEventListener('scroll', onScroll, { passive: true });
