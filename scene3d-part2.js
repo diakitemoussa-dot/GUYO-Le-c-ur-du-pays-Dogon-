@@ -936,6 +936,15 @@ window.setScene3DPart2Visible = function setScene3DPart2Visible(visible) {
 const PART2_FADE_OUT_MS = 1200; // doit rester synchronisé avec la transition CSS de #scene3d-part2
 
 window.goToPart1 = function goToPart1() {
+  // La Partie 1 est un récit déroulé par le scroll depuis le haut (progress 0 → 1).
+  // Sans ce retour en haut, le scroll reste où la Partie 2 l'avait laissé (fin de
+  // page) et la Partie 1 est alors fondue à 0 — village, textes et audio invisibles.
+  window.scrollTo(0, 0);
+  // Masquer l'écran de fin « DOGOKUN SORO » s'il était visible (fin de partie 2).
+  const endChapterScreen = document.getElementById('end-chapter-screen');
+  if (endChapterScreen) {
+    endChapterScreen.classList.remove('visible');
+  }
   // Commencer le chargement du modèle Partie 1 IMMÉDIATEMENT au clic sur l'avion,
   // en arrière-plan, sans bloquer la transition. Le modèle sera prêt quand
   // l'animation du fondu croisé sera terminée.

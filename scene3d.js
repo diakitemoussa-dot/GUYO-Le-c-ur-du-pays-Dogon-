@@ -14,11 +14,12 @@ const PARALLAX_SMOOTHING = 0.06;
 const IDLE_DELAY_MS = 140;
 const IDLE_RECENTER = 0.9;
 
-// Caméra de la Partie 1 : on utilise EXACTEMENT la caméra du GLB (position, rotation
-// et FOV tels qu'exportés depuis Blender), pour chaque modèle — scene-bananin.glb sur
-// grand écran (>700px), scene-bananin-mobile.glb sur petit écran. Le scroll joue les
-// animations du modèle dont la « CameraAction » qui anime le nœud caméra ; on
-// récupère donc sa pose (position + rotation) à chaque avancement de l'animation.
+// Caméra de la Partie 1 : on garde la POSITION exacte de la caméra du GLB (exportée
+// depuis Blender), pour chaque modèle — scene-bananin.glb sur grand écran (>700px),
+// scene-bananin-mobile.glb sur petit écran. La caméra du GLB est bien placée mais
+// vise à l'horizontale (le village est en dessous) : on la réoriente donc vers le
+// centre du village. Son FOV exporté (≈23° PC / 40° mobile) est trop étroit pour
+// cadrer le village : on applique un FOV plus large.
 const CAMERA_FOV_DEG = 45;
 const PARALLAX_DISTANCE_REFERENCE = 8;
 
@@ -632,9 +633,9 @@ function setProgress(progress) {
     action.time = progress * timelineDuration;
   });
   mixer.update(0);
-  // La « CameraAction » du modèle anime le nœud caméra : on copie sa pose monde animée
-  // sur la caméra de rendu, puis on mémorise cette pose comme nouvelle base.
-  syncCameraFromNode();
+  // La pose de base reste la caméra réorientée vers le village (position du GLB +
+  // lookAt). On ne resynchronise pas depuis le nœud caméra ici : sa « CameraAction »
+  // anime le nœud, pas la caméra de rendu, et sa rotation brute vise l'horizontale.
   basePosition.copy(camera.position);
   baseQuaternion.copy(camera.quaternion);
 }
@@ -689,14 +690,18 @@ function onScroll() {
 function init(gltf) {
   scene = gltf.scene;
   cameraNode = findCameraNode(gltf);
-  const camDef = cameraNode && cameraNode.camera;
-  const camFov = camDef && camDef.isPerspectiveCamera ? camDef.fov : CAMERA_FOV_DEG;
-  camera = new THREE.PerspectiveCamera(camFov, window.innerWidth / window.innerHeight, 0.1, 1000);
+  camera = new THREE.PerspectiveCamera(CAMERA_FOV_DEG, window.innerWidth / window.innerHeight, 0.1, 1000);
+  // Position (et rotation initiale) de la caméra du GLB.
   syncCameraFromNode();
 
-  // Cible du modèle (centre de sa boîte englobante) pour positionner la bulle AR et
-  // dimensionner la parallaxe par rapport à la distance réelle de la caméra du GLB.
+  // Cible du modèle (centre de sa boîte englobante) pour la bulle AR et la parallaxe.
   new THREE.Box3().setFromObject(scene).getCenter(frameCenter);
+  // La caméra du GLB vise à l'horizontale alors que le village est en dessous : on la
+  // réoriente vers le centre du village pour un cadrage « face au modèle ». La
+  // « CameraAction » continue d'animer le nœud caméra, mais on n'en reprend que la
+  // position initiale — on ne la resynchronise pas à chaque scroll (voir setProgress).
+  camera.lookAt(frameCenter);
+
   frameViewDir.copy(camera.position).sub(frameCenter).normalize();
   frameDistance = camera.position.distanceTo(frameCenter);
   parallaxScale = frameDistance / PARALLAX_DISTANCE_REFERENCE;
