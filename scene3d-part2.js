@@ -271,39 +271,57 @@ const CAMERA_ENTRY_ROTATION_MOBILE = new THREE.Euler(
 // GLB "WEB_Sky", elle affichait juste la couleur de fond plate du fog.
 let skyMaterial = null;
 
+// L'avion n'est qu'un petit quad (~0,34 unité de monde, ~60x30 px sur PC et à peine
+// ~25x13 px sur mobile) qui tourne sur lui-même : le viser au pixel près échoue
+// facilement, surtout au doigt. On détecte donc le clic via une SPHÈRE généreuse
+// centrée sur l'avion : tout appui à proximité compte comme un clic sur l'avion.
+const PLANE_HIT_RADIUS = 1.5; // unités de monde (l'avion fait ~0,34)
+const planeHitSphere = new THREE.Sphere();
+const planeHitPoint = new THREE.Vector3();
+
 function setupPlaneButton(plane, onClickCallback) {
   plane.userData.isButton = true;
   let isHoveringPlane = false;
 
-  const onMouseMove = (event) => {
+  const isPlaneHit = (event) => {
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-
     raycaster.setFromCamera(mouse, camera);
-    const intersects = raycaster.intersectObject(plane);
+    planeHitSphere.set(
+      new THREE.Vector3().setFromMatrixPosition(plane.matrixWorld),
+      PLANE_HIT_RADIUS,
+    );
+    return raycaster.ray.intersectSphere(planeHitSphere, planeHitPoint) !== null;
+  };
 
-    const hovering = intersects.length > 0;
+  const onMouseMove = (event) => {
+    const hovering = isPlaneHit(event);
     if (hovering !== isHoveringPlane) {
       isHoveringPlane = hovering;
       document.body.style.cursor = hovering ? 'pointer' : 'default';
     }
   };
 
-  const onMouseClick = (event) => {
-    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-
-    raycaster.setFromCamera(mouse, camera);
-    const intersects = raycaster.intersectObject(plane);
-
-    if (intersects.length > 0) {
+  // Sur mobile, la moindre glissade pendant l'appui (rotation de l'orbite, scroll)
+  // fait annuler le 'click' synthétisé par le navigateur : on détecte donc le tap via
+  // 'pointerup' sans mouvement, fiable à la souris comme au doigt, sans conflit.
+  let tapStartX = 0;
+  let tapStartY = 0;
+  const onPointerDown = (event) => {
+    tapStartX = event.clientX;
+    tapStartY = event.clientY;
+  };
+  const onPointerUp = (event) => {
+    const moved = Math.hypot(event.clientX - tapStartX, event.clientY - tapStartY);
+    if (moved < 10 && isPlaneHit(event)) {
       onClickCallback();
     }
   };
 
   window.addEventListener('mousemove', onMouseMove);
-  window.addEventListener('click', onMouseClick);
-  plane.userData.clickListener = onMouseClick;
+  window.addEventListener('pointerdown', onPointerDown);
+  window.addEventListener('pointerup', onPointerUp);
+  plane.userData.clickListener = onPointerUp;
 }
 
 function createTextBubble(text) {
@@ -569,14 +587,19 @@ function init(gltf) {
   // Configuration du Plane comme bouton interactif pour naviguer vers la partie 1
   planeObject = gltf.scene.getObjectByName('plane');
   if (planeObject) {
+    // La transition est déclenchée une seule fois : un double tap (ou un tap + clic
+    // doublé) ne relance pas goToPart1 plusieurs fois.
+    let navigationStarted = false;
     setupPlaneButton(planeObject, () => {
+      if (navigationStarted) return;
+      navigationStarted = true;
       // Son de transition joué au clic, puis navigation vers la partie 1
       playTransitionSound();
       if (typeof window.goToPart1 === 'function') {
         window.goToPart1();
       }
     });
-}
+  }
 
   setupBloom();
 
