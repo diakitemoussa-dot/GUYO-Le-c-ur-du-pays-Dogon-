@@ -14,14 +14,13 @@ const PARALLAX_SMOOTHING = 0.06;
 const IDLE_DELAY_MS = 140;
 const IDLE_RECENTER = 0.9;
 
-// Cadrage caméra de la Partie 1 : la caméra exportée dans le GLB (position initiale
-// ET chemin d'animation « CameraAction ») ne regarde jamais le village — 0 % du
-// modèle est visible sur tout le parcours (FOV ~23° orienté à ~55° du centre). On
-// construit donc une caméra JS qui cadre la boîte englobante du modèle tout en
-// respectant la direction de vue d'origine (l'artiste regardait le village selon +X).
+// Caméra de la Partie 1 : position définie par l'artiste dans Blender puis convertie
+// en coordonnées three.js/glTF (Blender X,Y,Z -> three X,Z,-Y). Cette position est bien
+// placée (face au village, ~99 % du modèle visible en visant le centre), contrairement
+// à l'orientation exportée dans le GLB (« CameraAction ») qui vise à ~55° du centre et
+// ne montre rien. On garde donc la position, mais on réoriente la caméra vers le centre.
 const CAMERA_FOV_DEG = 45;
-const CAMERA_FRAME_MARGIN = 1.2;
-const CAMERA_ELEVATION_DEG = 10;
+const CAMERA_BASE_POSITION = new THREE.Vector3(-3.5667, 3.1351, -1.6322);
 const PARALLAX_DISTANCE_REFERENCE = 8;
 
 let renderer = null;
@@ -41,7 +40,6 @@ const mouseCurrent = { x: 0, y: 0 };
 const tempRight = new THREE.Vector3();
 const tempUp = new THREE.Vector3();
 const tempBoxSize = new THREE.Vector3();
-const tempCameraQuat = new THREE.Quaternion();
 const tiltQuaternion = new THREE.Quaternion();
 const tiltEuler = new THREE.Euler();
 const tempForward = new THREE.Vector3();
@@ -447,42 +445,16 @@ function updateBirds(elapsedSeconds) {
   });
 }
 
-function findCamera(gltf) {
-  if (gltf.cameras && gltf.cameras.length) return gltf.cameras[0];
-  let found = null;
-  gltf.scene.traverse((obj) => {
-    if (!found && obj.isCamera) found = obj;
-  });
-  return found;
-}
-
 function buildFramingCamera(gltf) {
   const box = new THREE.Box3().setFromObject(gltf.scene);
   box.getCenter(frameCenter);
-  const size = box.getSize(tempBoxSize);
 
-  // Direction de vue d'origine du modèle (flattée sur XZ pour garder un horizon droit)
-  let camNode = null;
-  gltf.scene.traverse((obj) => {
-    if (!camNode && obj.camera) camNode = obj;
-  });
-  frameViewDir.set(0, 0, -1);
-  if (camNode) frameViewDir.applyQuaternion(camNode.getWorldQuaternion(tempCameraQuat));
-  frameViewDir.y = 0;
-  if (frameViewDir.lengthSq() < 0.0001) frameViewDir.set(0, 0, -1);
-  frameViewDir.normalize();
+  // Direction de vue : du centre du village vers la caméra (position d'origine).
+  frameViewDir.copy(CAMERA_BASE_POSITION).sub(frameCenter).normalize();
+  frameDistance = CAMERA_BASE_POSITION.distanceTo(frameCenter);
 
-  const fovHalf = THREE.MathUtils.degToRad(CAMERA_FOV_DEG / 2);
-  const aspect = window.innerWidth / window.innerHeight;
-  const distHeight = ((size.y * CAMERA_FRAME_MARGIN) / 2) / Math.tan(fovHalf);
-  const hFovHalf = Math.atan(Math.tan(fovHalf) * aspect);
-  const distWidth = ((size.z * CAMERA_FRAME_MARGIN) / 2) / Math.tan(hFovHalf);
-  frameDistance = Math.max(distHeight, distWidth, 1);
-
-  const cam = new THREE.PerspectiveCamera(CAMERA_FOV_DEG, aspect, 0.1, 1000);
-  cam.position.copy(frameCenter)
-    .addScaledVector(frameViewDir, frameDistance)
-    .add(tempBoxSize.set(0, Math.tan(THREE.MathUtils.degToRad(CAMERA_ELEVATION_DEG)) * frameDistance, 0));
+  const cam = new THREE.PerspectiveCamera(CAMERA_FOV_DEG, window.innerWidth / window.innerHeight, 0.1, 1000);
+  cam.position.copy(CAMERA_BASE_POSITION);
   cam.lookAt(frameCenter);
 
   // La parallaxe (décalage en unités monde) doit être proportionnelle à la distance
