@@ -14,6 +14,16 @@ const PARALLAX_SMOOTHING = 0.06;
 const IDLE_DELAY_MS = 140;
 const IDLE_RECENTER = 0.9;
 
+// Cadrage caméra de la Partie 1 : la caméra exportée dans le GLB (position initiale
+// ET chemin d'animation « CameraAction ») ne regarde jamais le village — 0 % du
+// modèle est visible sur tout le parcours (FOV ~23° orienté à ~55° du centre). On
+// construit donc une caméra JS qui cadre la boîte englobante du modèle tout en
+// respectant la direction de vue d'origine (l'artiste regardait le village selon +X).
+const CAMERA_FOV_DEG = 45;
+const CAMERA_FRAME_MARGIN = 1.2;
+const CAMERA_ELEVATION_DEG = 10;
+const PARALLAX_DISTANCE_REFERENCE = 8;
+
 let renderer = null;
 let scene = null;
 let camera = null;
@@ -30,11 +40,20 @@ const mouseTarget = { x: 0, y: 0 };
 const mouseCurrent = { x: 0, y: 0 };
 const tempRight = new THREE.Vector3();
 const tempUp = new THREE.Vector3();
+const tempBoxSize = new THREE.Vector3();
+const tempCameraQuat = new THREE.Quaternion();
 const tiltQuaternion = new THREE.Quaternion();
 const tiltEuler = new THREE.Euler();
 const tempForward = new THREE.Vector3();
 let lastMoveTime = 0;
 let startTime = 0;
+
+// Cible et axe de vue du cadrage (calculés dans buildFramingCamera), réutilisés pour
+// la bulle AR. frameViewDir pointe du centre du modèle vers la caméra.
+const frameCenter = new THREE.Vector3();
+const frameViewDir = new THREE.Vector3(0, 0, -1);
+let frameDistance = 1;
+let parallaxScale = 1;
 
 const BIRD_COUNT = 10;
 const birds = [];
@@ -437,6 +456,41 @@ function findCamera(gltf) {
   return found;
 }
 
+function buildFramingCamera(gltf) {
+  const box = new THREE.Box3().setFromObject(gltf.scene);
+  box.getCenter(frameCenter);
+  const size = box.getSize(tempBoxSize);
+
+  // Direction de vue d'origine du modèle (flattée sur XZ pour garder un horizon droit)
+  let camNode = null;
+  gltf.scene.traverse((obj) => {
+    if (!camNode && obj.camera) camNode = obj;
+  });
+  frameViewDir.set(0, 0, -1);
+  if (camNode) frameViewDir.applyQuaternion(camNode.getWorldQuaternion(tempCameraQuat));
+  frameViewDir.y = 0;
+  if (frameViewDir.lengthSq() < 0.0001) frameViewDir.set(0, 0, -1);
+  frameViewDir.normalize();
+
+  const fovHalf = THREE.MathUtils.degToRad(CAMERA_FOV_DEG / 2);
+  const aspect = window.innerWidth / window.innerHeight;
+  const distHeight = ((size.y * CAMERA_FRAME_MARGIN) / 2) / Math.tan(fovHalf);
+  const hFovHalf = Math.atan(Math.tan(fovHalf) * aspect);
+  const distWidth = ((size.z * CAMERA_FRAME_MARGIN) / 2) / Math.tan(hFovHalf);
+  frameDistance = Math.max(distHeight, distWidth, 1);
+
+  const cam = new THREE.PerspectiveCamera(CAMERA_FOV_DEG, aspect, 0.1, 1000);
+  cam.position.copy(frameCenter)
+    .addScaledVector(frameViewDir, frameDistance)
+    .add(tempBoxSize.set(0, Math.tan(THREE.MathUtils.degToRad(CAMERA_ELEVATION_DEG)) * frameDistance, 0));
+  cam.lookAt(frameCenter);
+
+  // La parallaxe (décalage en unités monde) doit être proportionnelle à la distance
+  // pour garder le même effet visuel à l'écran qu'avec la caméra d'origine.
+  parallaxScale = frameDistance / PARALLAX_DISTANCE_REFERENCE;
+  return cam;
+}
+
 function onResize() {
   if (!renderer) return;
   const width = window.innerWidth;
@@ -470,8 +524,8 @@ function applyParallaxAndRender() {
   tempUp.set(0, 1, 0).applyQuaternion(baseQuaternion);
 
   camera.position.copy(basePosition)
-    .addScaledVector(tempRight, mouseCurrent.x * MAX_PARALLAX_OFFSET)
-    .addScaledVector(tempUp, -mouseCurrent.y * MAX_PARALLAX_OFFSET);
+    .addScaledVector(tempRight, mouseCurrent.x * MAX_PARALLAX_OFFSET * parallaxScale)
+    .addScaledVector(tempUp, -mouseCurrent.y * MAX_PARALLAX_OFFSET * parallaxScale);
 
   tiltEuler.set(-mouseCurrent.y * MAX_PARALLAX_TILT, mouseCurrent.x * MAX_PARALLAX_TILT, 0);
   tiltQuaternion.setFromEuler(tiltEuler);
@@ -658,7 +712,7 @@ function onScroll() {
 
 function init(gltf) {
   scene = gltf.scene;
-  camera = findCamera(gltf);
+  camera = buildFramingCamera(gltf);
   makeUnlit(gltf);
   basePosition.copy(camera.position);
   baseQuaternion.copy(camera.quaternion);
@@ -684,10 +738,14 @@ function init(gltf) {
     timelineDuration = Math.max(...gltf.animations.map((clip) => clip.duration));
   }
 
-  // Créer la bulle AR avec le message d'instruction (design chaud/doré différencié)
+  // Créer la bulle AR avec le message d'instruction (design chaud/doré différencié).
+  // Placée entre la caméra et le village (à ~40 % de la distance de cadrage), à
+  // mi-hauteur du modèle, pour rester visible dans le nouveau cadrage.
   arBubble = createARTextBubble("n'oublie pas que clic sur le AR pour me place dans ton monde réel");
   scene.add(arBubble);
-  arBubble.position.set(-15, 3.5, 15);
+  arBubble.position.copy(frameCenter)
+    .addScaledVector(frameViewDir, frameDistance * 0.4)
+    .add(tempBoxSize.set(0, 4, 0));
   arBubbleBaseY = arBubble.position.y;
   arBubble.scale.set(0.25, 0.25, 0.25);
 
