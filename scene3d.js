@@ -726,6 +726,7 @@ loader.setDRACOLoader(dracoLoader);
 window.startLoadingPart1Model = function startLoadingPart1Model() {
   if (part1ModelLoadingStarted) return;
   part1ModelLoadingStarted = true;
+  if (window.onPart1LoadingStart) window.onPart1LoadingStart();
   loader.load(
     MODEL_PATH,
     (gltf) => {

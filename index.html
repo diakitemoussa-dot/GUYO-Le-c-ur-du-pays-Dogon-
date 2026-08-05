@@ -6,9 +6,15 @@
   <title>GUYO – Le cœur du pays dogon</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Special+Elite&family=Orbitron:wght@500;700&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
+  <!-- Polices chargées en non-bloquant (media="print" + onload) : elles ne retardent
+       plus l'affichage initial, surtout sur mobile où le CSS Google est lent. -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Special+Elite&family=Orbitron:wght@500;700&family=Share+Tech+Mono&display=swap" media="print" onload="this.media='all'" />
+  <noscript>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Special+Elite&family=Orbitron:wght@500;700&family=Share+Tech+Mono&display=swap" />
+  </noscript>
   <link rel="stylesheet" href="style.css" />
-  <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
+  <!-- model-viewer (bouton AR) n'est plus chargé ici : il est injecté dynamiquement
+       au premier clic sur le bouton AR pour ne pas alourdir le démarrage. -->
 </head>
 <body>
   <div id="loading-screen">
@@ -130,6 +136,16 @@
     </model-viewer>
   </div>
   <div id="scroll-space"></div>
+
+  <!-- Indicateur affiché pendant le chargement du modèle de la partie 1 (au clic sur
+       l'avion en papier). Sans lui, le retour vers le village semblait bloqué. -->
+  <div id="part1-loading" class="part1-loading hidden" role="status" aria-live="polite">
+    <svg class="part1-loading-spinner" viewBox="0 0 40 40" fill="none">
+      <circle cx="20" cy="20" r="16" stroke="currentColor" stroke-opacity="0.25" stroke-width="4" />
+      <path d="M20 4 a16 16 0 0 1 15 9" stroke="currentColor" stroke-width="4" stroke-linecap="round" />
+    </svg>
+    <p class="part1-loading-label">chargement du village…</p>
+  </div>
 
   <p id="story-text-1" class="story-text">bienvenue dans l'univers dogon<br>dans la quelle chaque famille<br>pose un grenier appelé Guyo</p>
   <p id="story-text-2" class="story-text story-text-right">durant la saison des pluies<br>les hommes cultivent la terre<br>pour remplir le grenier familial</p>

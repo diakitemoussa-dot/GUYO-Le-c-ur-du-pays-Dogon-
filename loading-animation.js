@@ -9,11 +9,16 @@ const pixelCtx = pixelCanvas.getContext('2d');
 const bufferCanvas = document.createElement('canvas');
 const bufferCtx = bufferCanvas.getContext('2d');
 
+// Image plein écran qui se "netteise" pendant le chargement : une version
+// paysage pour ordinateur, une version portrait pour mobile (format_pc /
+// format_smartphone), converties en WebP (les PNG d'origine font ~3 Mo chacun,
+// conservés dans asset-original/). Remplacent les anciennes 'entre pc.png' /
+// 'entre téléphone.png' qui n'existaient plus dans le dépôt.
 const isMobileLogo = window.matchMedia('(max-width: 700px)').matches;
 const logoImage = new Image();
 logoImage.src = isMobileLogo
-  ? 'asset/image/entre téléphone.png'
-  : 'asset/image/entre pc.png';
+  ? 'asset/image/format_smartphone.webp'
+  : 'asset/image/format_pc.webp';
 
 const pixelState = { ratio: 0 };
 const MIN_BLOCK_DIM = 6; // largeur (en "pixels") de l'image la plus grossière

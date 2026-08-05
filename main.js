@@ -2,10 +2,11 @@ import './loading-animation.js';
 import './scene3d.js';
 import './scene3d-part2.js';
 
+// Seul le ciel (affiché au retour vers la partie 1) est préchargé ici. Les anciennes
+// images la falaise / les roches / la coline étaient téléchargées au démarrage mais
+// n'étaient utilisées par AUCUN code : les modèles GLB embarquent leurs propres
+// textures. Elles bloquaient inutilement l'écran de chargement.
 const ASSETS_TO_PRELOAD = [
-  'asset/image/la coline ..webp',
-  'asset/image/la falaise ..webp',
-  'asset/image/les roches ..webp',
   'asset/image/sky.webp',
 ];
 
@@ -201,6 +202,20 @@ window.onScene3DPart2Progress = function onScene3DPart2Progress(ratio) {
   refreshProgressBar();
 };
 
+// Indicateur de chargement de la partie 1 : le modèle du village se charge en lazy
+// loading au clic sur l'avion en papier, sans barre de progression. On affiche un
+// petit spinner pour éviter que l'écran semble figé, et on le masque dès que le
+// modèle est prêt.
+const part1LoadingEl = document.getElementById('part1-loading');
+
+window.onPart1LoadingStart = function onPart1LoadingStart() {
+  if (part1LoadingEl) part1LoadingEl.classList.remove('hidden');
+};
+
+window.onScene3DReady(function onScene3DReadyHidePart1Indicator() {
+  if (part1LoadingEl) part1LoadingEl.classList.add('hidden');
+});
+
 function preloadImage(src) {
   return new Promise((resolve) => {
     const img = new Image();
@@ -331,12 +346,41 @@ function tryActivateAR() {
 
 let arModelRequested = false;
 
-arButton.addEventListener('click', () => {
+// model-viewer (~400 Ko depuis le CDN Google) n'est PAS chargé au démarrage : il
+// n'est utile qu'au clic sur le bouton AR. L'injecter à ce moment évite un gros
+// téléchargement + une requête CDN sur le chemin critique de l'écran de chargement.
+let arViewerScriptPromise = null;
+function ensureModelViewerLoaded() {
+  if (!arViewerScriptPromise) {
+    arViewerScriptPromise = new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.type = 'module';
+      script.src = 'https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js';
+      script.onload = () => {
+        // Attendre que le <model-viewer> soit transformé en composant actif (upgrade
+        // du custom element), sinon canActivateAR n'existe pas encore.
+        customElements.whenDefined('model-viewer').then(resolve).catch(reject);
+      };
+      script.onerror = reject;
+      document.head.appendChild(script);
+    });
+  }
+  return arViewerScriptPromise;
+}
+
+arButton.addEventListener('click', async () => {
   if (!arViewer) return;
-  // Le modèle (43 Mo) n'est chargé dans <model-viewer> qu'à ce moment précis,
-  // pas au chargement de la page : Three.js charge déjà ce même fichier pour
-  // afficher la scène, le charger une 2e fois en arrière-plan dès le départ
-  // doublait la bande passante nécessaire et bloquait l'écran de chargement.
+  try {
+    await ensureModelViewerLoaded();
+  } catch (e) {
+    arIncompatibilityScreen.classList.remove('hidden');
+    arIncompatibilityScreen.classList.add('visible');
+    return;
+  }
+  // Le modèle n'est chargé dans <model-viewer> qu'à ce moment précis, pas au
+  // chargement de la page : Three.js charge déjà ce même fichier pour afficher la
+  // scène, le charger une 2e fois en arrière-plan dès le départ doublait la bande
+  // passante nécessaire et bloquait l'écran de chargement.
   // (le setter .src de <model-viewer> ne reflète pas l'attribut HTML, d'où ce flag)
   if (!arModelRequested) {
     arModelRequested = true;
