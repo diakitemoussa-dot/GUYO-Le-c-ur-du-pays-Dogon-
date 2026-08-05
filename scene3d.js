@@ -14,18 +14,18 @@ const PARALLAX_SMOOTHING = 0.06;
 const IDLE_DELAY_MS = 140;
 const IDLE_RECENTER = 0.9;
 
-// Caméra de la Partie 1 : position définie par l'artiste dans Blender puis convertie
-// en coordonnées three.js/glTF (Blender X,Y,Z -> three X,Z,-Y). Cette position est bien
-// placée (face au village, ~99 % du modèle visible en visant le centre), contrairement
-// à l'orientation exportée dans le GLB (« CameraAction ») qui vise à ~55° du centre et
-// ne montre rien. On garde donc la position, mais on réoriente la caméra vers le centre.
+// Caméra de la Partie 1 : on utilise EXACTEMENT la caméra du GLB (position, rotation
+// et FOV tels qu'exportés depuis Blender), pour chaque modèle — scene-bananin.glb sur
+// grand écran (>700px), scene-bananin-mobile.glb sur petit écran. Le scroll joue les
+// animations du modèle dont la « CameraAction » qui anime le nœud caméra ; on
+// récupère donc sa pose (position + rotation) à chaque avancement de l'animation.
 const CAMERA_FOV_DEG = 45;
-const CAMERA_BASE_POSITION = new THREE.Vector3(-3.5667, 3.1351, -1.6322);
 const PARALLAX_DISTANCE_REFERENCE = 8;
 
 let renderer = null;
 let scene = null;
 let camera = null;
+let cameraNode = null;
 let mixer = null;
 let actions = [];
 let timelineDuration = 0;
@@ -40,14 +40,15 @@ const mouseCurrent = { x: 0, y: 0 };
 const tempRight = new THREE.Vector3();
 const tempUp = new THREE.Vector3();
 const tempBoxSize = new THREE.Vector3();
+const tempScale = new THREE.Vector3();
 const tiltQuaternion = new THREE.Quaternion();
 const tiltEuler = new THREE.Euler();
 const tempForward = new THREE.Vector3();
 let lastMoveTime = 0;
 let startTime = 0;
 
-// Cible et axe de vue du cadrage (calculés dans buildFramingCamera), réutilisés pour
-// la bulle AR. frameViewDir pointe du centre du modèle vers la caméra.
+// Cible du modèle et direction du centre vers la caméra du GLB, réutilisées pour la
+// bulle AR. frameViewDir pointe du centre du modèle vers la caméra.
 const frameCenter = new THREE.Vector3();
 const frameViewDir = new THREE.Vector3(0, 0, -1);
 let frameDistance = 1;
@@ -445,22 +446,22 @@ function updateBirds(elapsedSeconds) {
   });
 }
 
-function buildFramingCamera(gltf) {
-  const box = new THREE.Box3().setFromObject(gltf.scene);
-  box.getCenter(frameCenter);
+// Le nœud de la scène qui porte la caméra (l'objet « Camera » exporté de Blender).
+// C'est lui que la « CameraAction » anime ; on copie sa pose monde sur la caméra de
+// rendu à chaque avancement de l'animation.
+function findCameraNode(gltf) {
+  let found = null;
+  gltf.scene.traverse((obj) => {
+    if (!found && obj.camera) found = obj;
+  });
+  return found;
+}
 
-  // Direction de vue : du centre du village vers la caméra (position d'origine).
-  frameViewDir.copy(CAMERA_BASE_POSITION).sub(frameCenter).normalize();
-  frameDistance = CAMERA_BASE_POSITION.distanceTo(frameCenter);
-
-  const cam = new THREE.PerspectiveCamera(CAMERA_FOV_DEG, window.innerWidth / window.innerHeight, 0.1, 1000);
-  cam.position.copy(CAMERA_BASE_POSITION);
-  cam.lookAt(frameCenter);
-
-  // La parallaxe (décalage en unités monde) doit être proportionnelle à la distance
-  // pour garder le même effet visuel à l'écran qu'avec la caméra d'origine.
-  parallaxScale = frameDistance / PARALLAX_DISTANCE_REFERENCE;
-  return cam;
+function syncCameraFromNode() {
+  if (!cameraNode) return;
+  cameraNode.updateWorldMatrix(true, false);
+  cameraNode.matrixWorld.decompose(camera.position, camera.quaternion, tempScale);
+  camera.updateMatrixWorld();
 }
 
 function onResize() {
@@ -631,6 +632,9 @@ function setProgress(progress) {
     action.time = progress * timelineDuration;
   });
   mixer.update(0);
+  // La « CameraAction » du modèle anime le nœud caméra : on copie sa pose monde animée
+  // sur la caméra de rendu, puis on mémorise cette pose comme nouvelle base.
+  syncCameraFromNode();
   basePosition.copy(camera.position);
   baseQuaternion.copy(camera.quaternion);
 }
@@ -684,7 +688,19 @@ function onScroll() {
 
 function init(gltf) {
   scene = gltf.scene;
-  camera = buildFramingCamera(gltf);
+  cameraNode = findCameraNode(gltf);
+  const camDef = cameraNode && cameraNode.camera;
+  const camFov = camDef && camDef.isPerspectiveCamera ? camDef.fov : CAMERA_FOV_DEG;
+  camera = new THREE.PerspectiveCamera(camFov, window.innerWidth / window.innerHeight, 0.1, 1000);
+  syncCameraFromNode();
+
+  // Cible du modèle (centre de sa boîte englobante) pour positionner la bulle AR et
+  // dimensionner la parallaxe par rapport à la distance réelle de la caméra du GLB.
+  new THREE.Box3().setFromObject(scene).getCenter(frameCenter);
+  frameViewDir.copy(camera.position).sub(frameCenter).normalize();
+  frameDistance = camera.position.distanceTo(frameCenter);
+  parallaxScale = frameDistance / PARALLAX_DISTANCE_REFERENCE;
+
   makeUnlit(gltf);
   basePosition.copy(camera.position);
   baseQuaternion.copy(camera.quaternion);
