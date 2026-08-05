@@ -715,7 +715,7 @@ const MODEL_PATH = window.innerWidth <= MOBILE_MODEL_BREAKPOINT_PX
   : 'asset/model/scene-bananin.glb';
 
 const dracoLoader = new DRACOLoader();
-dracoLoader.setDecoderPath('https://unpkg.com/three@0.164.0/examples/jsm/libs/draco/');
+dracoLoader.setDecoderPath('libs/draco/');
 
 const loader = new GLTFLoader();
 loader.setDRACOLoader(dracoLoader);

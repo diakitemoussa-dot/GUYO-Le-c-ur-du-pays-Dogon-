@@ -3,10 +3,10 @@ import './scene3d.js';
 import './scene3d-part2.js';
 
 const ASSETS_TO_PRELOAD = [
-  'asset/image/la coline ..jpg',
-  'asset/image/la falaise ..png',
-  'asset/image/les roches ..png',
-  'asset/image/sky.png',
+  'asset/image/la coline ..webp',
+  'asset/image/la falaise ..webp',
+  'asset/image/les roches ..webp',
+  'asset/image/sky.webp',
 ];
 
 const loadingScreen = document.getElementById('loading-screen');
@@ -23,9 +23,12 @@ const SCROLL_SPACE_MULTIPLIER = 40;
 // Ambiance de vent en boucle pour la partie 1. Les navigateurs bloquent l'autoplay
 // avec son tant qu'il n'y a pas eu d'interaction utilisateur, donc on retente au
 // premier scroll/clic/touche si la tentative initiale échoue.
+// Le vent n'est chargé qu'au premier geste utilisateur (précharger 700 Ko de MP3
+// au démarrage ralentissait l'écran de chargement pour un son qui ne peut de toute
+// façon pas jouer avant une interaction, à cause de l'autoplay bloqué).
 const ambientAudio = new Audio('asset/audio/wind-ambience.mp3');
 ambientAudio.loop = true;
-ambientAudio.preload = 'auto';
+ambientAudio.preload = 'none';
 ambientAudio.volume = 0;
 
 // Son joué à l'entrée dans la partie 2 (juste après le chargement).
