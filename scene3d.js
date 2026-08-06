@@ -52,7 +52,13 @@ const frameViewDir = new THREE.Vector3(0, 0, -1);
 let frameDistance = 1;
 let parallaxScale = 1;
 
-const BIRD_COUNT = 10;
+// Seuil mobile partagé par le choix du modèle, la résolution du rendu et le nombre
+// d'oiseaux : sous 700px on allège le chargement (modèle dédié) ET le rendu (moins de
+// pixels, moins de sprites) pour garder la partie village stable sur téléphone.
+const MOBILE_BREAKPOINT_PX = 700;
+const IS_MOBILE = window.innerWidth <= MOBILE_BREAKPOINT_PX;
+
+const BIRD_COUNT = IS_MOBILE ? 6 : 10;
 const birds = [];
 
 function wrapRange(value, range) {
@@ -556,7 +562,9 @@ function init(gltf) {
 
   renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setClearColor(0x000000, 0);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  // Sur mobile, limiter le pixelRatio à 1.5 (au lieu de 2) : ~44 % de pixels en
+  // moins à remplir, gain net de fluidité sans perte visible sur écran de téléphone.
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, IS_MOBILE ? 1.5 : 2));
   const firstChild = container.firstChild;
   if (firstChild) {
     container.insertBefore(renderer.domElement, firstChild);
@@ -593,8 +601,7 @@ let part1ModelLoadingStarted = false;
 // Même seuil que le choix d'image phone/pc du logo de chargement (style.css) : sous
 // 700px on charge un modèle dédié smartphone, au-dessus le modèle PC habituel. Le
 // reste de la logique (caméra, animation, parallaxe) est identique dans les deux cas.
-const MOBILE_MODEL_BREAKPOINT_PX = 700;
-const MODEL_PATH = window.innerWidth <= MOBILE_MODEL_BREAKPOINT_PX
+const MODEL_PATH = IS_MOBILE
   ? 'asset/model/scene-bananin-mobile.glb'
   : 'asset/model/scene-bananin.glb';
 

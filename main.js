@@ -12,7 +12,7 @@ const ASSETS_TO_PRELOAD = [
 
 const loadingScreen = document.getElementById('loading-screen');
 const experience = document.getElementById('experience');
-const revealCircle = document.getElementById('reveal-circle');
+const skyImage = document.getElementById('sky-image');
 const scene3d = document.getElementById('scene3d');
 const scene3dPart2 = document.getElementById('scene3d-part2');
 const scrollSpace = document.getElementById('scroll-space');
@@ -244,6 +244,8 @@ function playRevealAnimation() {
   const maxRadius = Math.sqrt(
     window.innerWidth * window.innerWidth + window.innerHeight * window.innerHeight
   ) / 2 + 120;
+  const cx = window.innerWidth / 2;
+  const cy = window.innerHeight / 2;
   const duration = 3500;
   let start = null;
 
@@ -252,10 +254,15 @@ function playRevealAnimation() {
     const elapsed = timestamp - start;
     const progress = Math.min(elapsed / duration, 1);
     const radius = easeOutCubic(progress) * maxRadius;
-    revealCircle.setAttribute('r', String(radius));
+    if (skyImage) {
+      skyImage.style.clipPath = `circle(${radius}px at ${cx}px ${cy}px)`;
+    }
     if (progress < 1) {
       requestAnimationFrame(step);
     } else {
+      // Retirer le clip-path une fois la révélation terminée : le ciel est affiché
+      // en entier, sans coût GPU résiduel (important sur mobile).
+      if (skyImage) skyImage.style.clipPath = '';
       if (scrollHint) scrollHint.classList.add('visible');
       // Ne pas appeler transitionToScene3D ici si c'est appelé depuis goToPart1
     }
