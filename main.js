@@ -392,7 +392,7 @@ arButton.addEventListener('click', async () => {
       playAllARAnimations();
       tryActivateAR();
     }, { once: true });
-    arViewer.src = 'asset/model/scene-partie2.glb';
+    arViewer.src = 'asset/model/le_guyo_AR.glb';
   } else {
     tryActivateAR();
   }
