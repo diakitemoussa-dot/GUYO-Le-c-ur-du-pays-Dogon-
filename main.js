@@ -463,17 +463,21 @@ arIncompatibilityBtn.addEventListener('click', () => {
   arIncompatibilityScreen.classList.add('hidden');
 });
 
-// Bouton Retour - Retourner à Partie 1 depuis l'écran DOGOKUN SORO
+// Bouton Retour - retour au grenier (partie 2) depuis l'écran DOGOKUN SORO
 const returnBtn = document.getElementById('return-btn');
 returnBtn.addEventListener('click', () => {
-  // Cacher l'écran de fin et revenir à Partie 1
+  // Cacher l'écran de fin et revenir au début du voyage (scroll en haut).
   endChapterScreen.classList.remove('visible');
   window.scrollTo(0, 0);
   endChapterShown = false;
-  // scrollTo(0,0) seul ne révèle pas #scene3d : sans clic préalable sur l'avion
-  // en papier, cette div est toujours hidden=true et #scene3d-part2 reste affiché.
-  // On réutilise la même transition que le clic sur l'avion pour vraiment basculer.
-  if (typeof window.goToPart1 === 'function') {
-    window.goToPart1();
-  }
+  // Le scroll en haut ramène la partie 1 à pleine opacité : le handler de scroll
+  // de scene3d.js masque alors la partie 2 (setScene3DPart2Visible(false) dès que
+  // progress < 1). On réaffiche donc le grenier (partie 2) APRÈS que le scroll se
+  // soit stabilisé, pour que l'utilisateur retombe dessus, prêt à recliquer sur
+  // l'avion en papier et à rejouer le voyage.
+  setTimeout(() => {
+    if (typeof window.setScene3DPart2Visible === 'function') {
+      window.setScene3DPart2Visible(true);
+    }
+  }, 120);
 });
