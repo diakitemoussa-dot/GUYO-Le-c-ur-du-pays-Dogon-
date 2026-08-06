@@ -107,10 +107,17 @@ function makeShadable(gltf) {
 }
 
 function addLighting(scene, target) {
-  const ambient = new THREE.HemisphereLight(0xfff3e0, 0x3a2f28, 0.9);
+  // Éclairage global de base : rien ne reste dans l'ombre, même côté nuit.
+  const fill = new THREE.AmbientLight(0xffffff, 0.6);
+  scene.add(fill);
+
+  // Hémisphérique renforcé : ciel clair chaud au-dessus, sol clair en dessous
+  // (l'ancien sol 0x3a2f28 tirait toute la scène vers le sombre).
+  const ambient = new THREE.HemisphereLight(0xfff3e0, 0x6a5d6e, 1.4);
   scene.add(ambient);
 
-  const sun = new THREE.DirectionalLight(0xfff1d6, 3);
+  // Lumière principale (soleil), plus intense pour révéler les détails.
+  const sun = new THREE.DirectionalLight(0xfff1d6, 4.2);
   sun.position.set(target.x + 6, target.y + 10, target.z + 6);
   sun.target.position.copy(target);
   sun.castShadow = true;
@@ -124,6 +131,13 @@ function addLighting(scene, target) {
   sun.shadow.bias = -0.0015;
   scene.add(sun);
   scene.add(sun.target);
+
+  // Lumière de remplissage opposée : adoucit les ombres et évite les faces sombres.
+  const rim = new THREE.DirectionalLight(0xbfe8ff, 0.9);
+  rim.position.set(target.x - 8, target.y + 4, target.z - 8);
+  rim.target.position.copy(target);
+  scene.add(rim);
+  scene.add(rim.target);
 }
 
 // ATTIC est l'objet central de l'expérience : la caméra orbite toujours autour de lui.
@@ -408,12 +422,13 @@ function createProceduralSky() {
   skyMaterial = new THREE.ShaderMaterial({
     uniforms: {
       time: { value: 0 },
-      // Palette assombrie "galaxie" : indigo profond au zénith, prune sombre à
-      // l'horizon, nuages gris-violet discrets plutôt que blancs et lumineux.
-      horizonColor: { value: new THREE.Color(0x2a1f3d) },
-      zenithColor: { value: new THREE.Color(0x0c0a18) },
-      lowSkyColor: { value: new THREE.Color(0x3a2a34) },
-      cloudColor: { value: new THREE.Color(0x6a5d78) },
+      // Palette "galaxie" éclaircie : indigo au zénith, prune à l'horizon, nuages
+      // gris-violet visibles (l'ancienne palette était si sombre qu'elle noyait
+      // toute la scène dans une nuit opaque).
+      horizonColor: { value: new THREE.Color(0x3d3160) },
+      zenithColor: { value: new THREE.Color(0x191433) },
+      lowSkyColor: { value: new THREE.Color(0x4a3747) },
+      cloudColor: { value: new THREE.Color(0x7d6f90) },
     },
     vertexShader: `
       varying vec3 vWorldDir;
@@ -554,9 +569,12 @@ function init(gltf) {
   camera.updateProjectionMatrix();
   makeShadable(gltf);
 
-  // Violet foncé de la charte graphique (depuis la suppression du dôme de ciel WEB_Sky).
-  const FOG_COLOR = 0x55415d;
-  scene.fog = new THREE.FogExp2(FOG_COLOR, 0.035);
+  // Violet de la charte graphique, mais éclairci et beaucoup moins dense : l'ancien
+  // FogExp2(0x55415d, 0.035) enveloppait toute la scène dans une brume sombre qui la
+  // rendait floue. La densité réduite laisse la scène nette, tout en gardant la fusion
+  // d'horizon avec le ciel.
+  const FOG_COLOR = 0x6a5d78;
+  scene.fog = new THREE.FogExp2(FOG_COLOR, 0.02);
   scene.add(createProceduralSky());
   scene.add(createStarField());
   camera.far = Math.max(camera.far, 500);
