@@ -700,8 +700,10 @@ window.onScene3DPart2CanvasReady = function onScene3DPart2CanvasReady(callback) 
   else canvasReadyCallback = callback;
 };
 
+// Cache-buster : le modèle change régulièrement (édité dans Blender), on force
+// le navigateur à re-télécharger la dernière version (évite l'ancienne copie en cache).
 loader.load(
-  'asset/model/SCENE_1.glb',
+  'asset/model/SCENE_1.glb?v=2',
   (gltf) => {
     loadedGltf = gltf;
     if (part2ReadyCallback) part2ReadyCallback();
