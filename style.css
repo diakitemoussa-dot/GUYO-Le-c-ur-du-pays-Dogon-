@@ -866,12 +866,13 @@ body {
 
 /* Barre de contrôle de vitesse du Plane */
 
-/* Indicateur de chargement du modèle de la partie 1 (affiché au clic sur l'avion) */
+/* Indicateur de chargement du modèle de la partie 1 (affiché au clic sur l'avion).
+   Placé en haut de l'écran, au-dessus de l'icône scroll (#scroll-hint, centrée). */
 .part1-loading {
   position: fixed;
-  top: 50%;
+  top: 18%;
   left: 50%;
-  transform: translate(-50%, -50%);
+  transform: translateX(-50%);
   display: flex;
   flex-direction: column;
   align-items: center;
