@@ -64,10 +64,6 @@ const dustMouseIntersect = new THREE.Vector3();
 const dustMouseTarget = new THREE.Vector3();
 const dustPlaneNormal = new THREE.Vector3();
 
-// Bulle de texte, toujours visible
-let textBubble = null;
-let textBubbleBaseY = 0; // Position Y de départ pour l'oscillation
-
 // Contrôle de vitesse du Plane
 let planeObject = null;
 // Empêche la caméra de traverser les murs/toit du grenier (ATTIC) pendant l'orbite :
@@ -345,78 +341,6 @@ function setupPlaneButton(plane, onClickCallback) {
   plane.userData.clickListener = onPointerUp;
 }
 
-function createTextBubble(text) {
-  const canvas = document.createElement('canvas');
-  canvas.width = 512;
-  canvas.height = 256;
-  const ctx = canvas.getContext('2d');
-
-  // Ombre sous la bulle pour le relief
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
-  ctx.beginPath();
-  ctx.ellipse(canvas.width / 2, canvas.height - 8, canvas.width * 0.4, 12, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Fond blanc arrondi avec dégradé léger pour le relief
-  const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height - 24);
-  gradient.addColorStop(0, '#ffffff');
-  gradient.addColorStop(1, '#f5f5f5');
-  ctx.fillStyle = gradient;
-  ctx.strokeStyle = '#333333';
-  ctx.lineWidth = 3;
-  const radius = 20;
-  ctx.beginPath();
-  ctx.moveTo(radius, 0);
-  ctx.lineTo(canvas.width - radius, 0);
-  ctx.quadraticCurveTo(canvas.width, 0, canvas.width, radius);
-  ctx.lineTo(canvas.width, canvas.height - radius - 24);
-  ctx.quadraticCurveTo(canvas.width, canvas.height - 24, canvas.width - radius, canvas.height - 24);
-  ctx.lineTo(canvas.width * 0.6, canvas.height - 24);
-  ctx.lineTo(canvas.width * 0.55, canvas.height);
-  ctx.lineTo(canvas.width * 0.5, canvas.height - 24);
-  ctx.lineTo(radius, canvas.height - 24);
-  ctx.quadraticCurveTo(0, canvas.height - 24, 0, canvas.height - radius - 24);
-  ctx.lineTo(0, radius);
-  ctx.quadraticCurveTo(0, 0, radius, 0);
-  ctx.fill();
-  ctx.stroke();
-
-  // Texte noir, avec retour à la ligne automatique pour les phrases longues
-  ctx.fillStyle = '#1a1a1a';
-  ctx.font = 'bold 32px Arial';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-
-  const maxTextWidth = canvas.width - 48;
-  const words = text.split(' ');
-  const lines = [];
-  let currentLine = '';
-  words.forEach((word) => {
-    const testLine = currentLine ? `${currentLine} ${word}` : word;
-    if (ctx.measureText(testLine).width > maxTextWidth && currentLine) {
-      lines.push(currentLine);
-      currentLine = word;
-    } else {
-      currentLine = testLine;
-    }
-  });
-  if (currentLine) lines.push(currentLine);
-
-  const lineHeight = 44;
-  const textAreaCenterY = (canvas.height - 24) / 2;
-  const startY = textAreaCenterY - ((lines.length - 1) * lineHeight) / 2;
-  lines.forEach((line, i) => {
-    ctx.fillText(line, canvas.width / 2, startY + i * lineHeight);
-  });
-
-  const texture = new THREE.CanvasTexture(canvas);
-  const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
-  const sprite = new THREE.Sprite(spriteMaterial);
-  sprite.scale.set(4, 2, 1);
-  return sprite;
-}
-
-
 function createProceduralSky() {
   const geometry = new THREE.SphereGeometry(400, 32, 16);
   skyMaterial = new THREE.ShaderMaterial({
@@ -605,15 +529,6 @@ function init(gltf) {
 
   terrainMesh = gltf.scene.getObjectByName('Meshy_output') || null;
 
-  // Bulle aux coordonnées précises (depuis Blender, converties en Three.js)
-  // Conversion Blender (X, Y, Z) → Three.js (X, Z, -Y)
-  textBubble = createTextBubble('clic sur l\'avion en papier pour connaitre l\'histoire du coeur de l\'univers dogon');
-  scene.add(textBubble);
-  textBubble.position.set(-28.978, 5.0, 16.621);
-  textBubbleBaseY = 5.0; // Stocker la position Y de départ pour l'oscillation
-  textBubble.scale.multiplyScalar(0.2);
-  textBubble.visible = true;
-
   // Configuration du Plane comme bouton interactif pour naviguer vers la partie 1
   planeObject = gltf.scene.getObjectByName('plane');
   if (planeObject) {
@@ -708,17 +623,6 @@ function init(gltf) {
     // Rotation lente et constante du Plane
     if (planeObject) {
       planeObject.rotation.z += 0.01;
-    }
-
-    // Animation de la bulle : oscillation douce de droite à gauche pour attirer l'attention
-    if (textBubble) {
-      const t = clock.elapsedTime;
-      // Mouvement lent et fluide en X (droite-gauche) : ±0.12 unités à 1.5 Hz
-      textBubble.position.x = -28.978 + Math.sin(t * 1.5) * 0.12;
-      // Position Y stable, pas de mouvement vertical
-      textBubble.position.y = textBubbleBaseY;
-      // Rotation très subtile qui suit le mouvement horizontal
-      textBubble.rotation.z = Math.sin(t * 1.5) * 0.04;
     }
 
     // Clignotement continu du halo jaune sur la poussière : lueur toujours forte,
@@ -964,6 +868,10 @@ window.startScene3DPart2 = function startScene3DPart2() {
 window.setScene3DPart2Visible = function setScene3DPart2Visible(visible) {
   if (visible === revealed) return;
   revealed = visible;
+  // Mettre à jour la navigation d'étape : grenier (étape 2) ou histoire (étape 1).
+  if (typeof window.setStageNav === 'function') {
+    window.setStageNav(visible ? 'grenier' : 'story');
+  }
   if (visible) {
     container.hidden = false;
     // Réactiver le clic sur l'avion : chaque retour en partie 2 doit rendre l'avion
@@ -981,6 +889,10 @@ window.setScene3DPart2Visible = function setScene3DPart2Visible(visible) {
 const PART2_FADE_OUT_MS = 1200; // doit rester synchronisé avec la transition CSS de #scene3d-part2
 
 window.goToPart1 = function goToPart1() {
+  // Mettre à jour la navigation d'étape : on entre dans l'histoire (étape 1).
+  if (typeof window.setStageNav === 'function') {
+    window.setStageNav('story');
+  }
   // La Partie 1 est un récit déroulé par le scroll depuis le haut (progress 0 → 1).
   // Sans ce retour en haut, le scroll reste où la Partie 2 l'avait laissé (fin de
   // page) et la Partie 1 est alors fondue à 0 — village, textes et audio invisibles.

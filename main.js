@@ -291,6 +291,9 @@ function transitionToScene3D() {
   scene3dPart2.classList.add('visible');
   scrollSpace.style.height = `${window.innerHeight * SCROLL_SPACE_MULTIPLIER}px`;
   tryPlayEntranceSound();
+  // Le voyage commence au grenier (étape 2) : la navigation d'étape le confirme.
+  stageNavBtn.classList.remove('hidden');
+  setStageNav('grenier');
   if (typeof window.startScene3DPart2 === 'function') {
     window.startScene3DPart2();
   } else {
@@ -344,6 +347,40 @@ const endChapterScreen = document.getElementById('end-chapter-screen');
 const dogoBtn = document.getElementById('dogo-kun-soro-btn');
 let endChapterShown = false;
 
+// Bouton de navigation d'étape (grenier ↔ histoire), remplace l'ancienne bulle 3D :
+// - au grenier (étape 2) : « l'histoire → » lance le récit (étape 1) ;
+// - dans l'histoire (étape 1) : « → le grenier » ramène au grenier (étape 2).
+const stageNavBtn = document.getElementById('stage-nav-btn');
+const stageNavLabel = document.getElementById('stage-nav-label');
+let currentStage = 'grenier';
+
+function setStageNav(stage) {
+  currentStage = stage;
+  stageNavLabel.textContent = stage === 'grenier' ? 'l\u2019histoire \u2192' : '\u2192 le grenier';
+}
+window.setStageNav = setStageNav;
+
+stageNavBtn.addEventListener('click', () => {
+  if (currentStage === 'grenier') {
+    // Étape 2 → 1 : lancer l'histoire (même action que l'avion en papier).
+    if (typeof window.goToPart1 === 'function') {
+      window.goToPart1();
+    }
+  } else {
+    // Étape 1 → 2 : revenir au grenier. On remonte d'abord en haut (le handler de
+    // scroll de scene3d.js masque la partie 2 dès que progress < 1), puis on
+    // réaffiche le grenier après que le scroll s'est stabilisé.
+    endChapterScreen.classList.remove('visible');
+    endChapterShown = false;
+    window.scrollTo(0, 0);
+    setTimeout(() => {
+      if (typeof window.setScene3DPart2Visible === 'function') {
+        window.setScene3DPart2Visible(true);
+      }
+    }, 120);
+  }
+});
+
 window.addEventListener('scroll', () => {
   if (!endChapterShown && scrollSpace) {
     const scrollHeight = scrollSpace.offsetHeight;
@@ -354,6 +391,8 @@ window.addEventListener('scroll', () => {
     if (scrollProgress >= 0.95) {
       endChapterShown = true;
       endChapterScreen.classList.add('visible');
+      // L'écran de fin a son propre bouton « RETOUR » : masquer la navigation d'étape.
+      stageNavBtn.classList.add('hidden');
     }
   }
 });
@@ -508,4 +547,7 @@ returnBtn.addEventListener('click', () => {
       window.setScene3DPart2Visible(true);
     }
   }, 120);
+  // De retour au grenier (étape 2) : réafficher la navigation d'étape.
+  stageNavBtn.classList.remove('hidden');
+  setStageNav('grenier');
 });

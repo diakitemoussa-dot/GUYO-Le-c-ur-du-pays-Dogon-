@@ -60,6 +60,14 @@
     </svg>
   </button>
 
+  <!-- Bouton de navigation d'étape, toujours visible pendant le voyage :
+       - au grenier (étape 2) : « l'histoire → » lance le récit (étape 1) ;
+       - dans l'histoire (étape 1) : « → le grenier » ramène au grenier (étape 2).
+       Remplace l'ancienne bulle 3D (« clic sur l'avion en papier »), peu claire. -->
+  <button id="stage-nav-btn" class="stage-nav-btn hidden" type="button" aria-label="Changer d'étape">
+    <span id="stage-nav-label" class="stage-nav-label">l'histoire →</span>
+  </button>
+
   <div id="scene3d" hidden>
     <!-- Ciel : l'ancien mask SVG + filtre feDisplacementMap plein écran (reveal-mask /
          watercolor-bleed) ne se rendait pas sur mobile (ciel invisible + GPU saturé).

@@ -940,3 +940,47 @@ body {
   color: #55415d;
   white-space: nowrap;
 }
+
+/* Bouton de navigation d'étape (grenier ↔ histoire), fixe en bas d'écran */
+.stage-nav-btn {
+  position: fixed;
+  bottom: max(20px, env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  padding: 14px 28px;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  color: #f4efe6;
+  background: rgba(85, 65, 93, 0.92);
+  border: 2px solid #f4efe6;
+  cursor: pointer;
+  font-family: 'Orbitron', 'Share Tech Mono', monospace;
+  text-transform: uppercase;
+  border-radius: 999px;
+  box-shadow: 0 4px 18px rgba(85, 65, 93, 0.35);
+  transition: all 0.3s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.stage-nav-btn:hover {
+  background: #55415d;
+  transform: translateX(-50%) translateY(-2px);
+  box-shadow: 0 8px 30px rgba(85, 65, 93, 0.45);
+}
+
+.stage-nav-btn:active {
+  transform: translateX(-50%) translateY(0);
+}
+
+.stage-nav-btn.hidden {
+  display: none;
+}
+
+@media (max-width: 700px) {
+  .stage-nav-btn {
+    padding: 12px 22px;
+    font-size: 14px;
+  }
+}
