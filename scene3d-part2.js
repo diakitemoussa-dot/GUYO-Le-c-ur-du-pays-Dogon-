@@ -588,6 +588,11 @@ function init(gltf) {
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   container.appendChild(renderer.domElement);
 
+  if (canvasReadyCallback) {
+    canvasReadyCallback();
+    canvasReadyCallback = null;
+  }
+
   controls = new OrbitControls(camera, renderer.domElement);
   controls.target.copy(getModelCenter(gltf));
   controls.enableDamping = true;
@@ -779,10 +784,16 @@ const loader = new GLTFLoader();
 loader.setDRACOLoader(dracoLoader);
 
 let part2ReadyCallback = null;
+let canvasReadyCallback = null;
 
 window.onScene3DPart2Ready = function onScene3DPart2Ready(callback) {
   if (loadedGltf) callback();
   else part2ReadyCallback = callback;
+};
+
+window.onScene3DPart2CanvasReady = function onScene3DPart2CanvasReady(callback) {
+  if (renderer) callback();
+  else canvasReadyCallback = callback;
 };
 
 loader.load(
@@ -794,6 +805,12 @@ loader.load(
   (event) => {
     if (window.onScene3DPart2Progress && event.total) {
       window.onScene3DPart2Progress(event.loaded / event.total);
+    }
+  },
+  (error) => {
+    console.error('Échec du chargement de scene-partie2.glb :', error);
+    if (typeof window.onScene3DPart2Error === 'function') {
+      window.onScene3DPart2Error(error);
     }
   }
 );

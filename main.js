@@ -10,7 +10,6 @@ const ASSETS_TO_PRELOAD = [
   'asset/image/sky.webp',
 ];
 
-const loadingScreen = document.getElementById('loading-screen');
 const experience = document.getElementById('experience');
 const skyImage = document.getElementById('sky-image');
 const scene3d = document.getElementById('scene3d');
@@ -187,9 +186,6 @@ function refreshProgressBar() {
   if (typeof window.onLoadingProgress === 'function') {
     window.onLoadingProgress(ratio);
   }
-  if (loadedCount === ASSETS_TO_PRELOAD.length && glbReady) {
-    onLoadingComplete();
-  }
 }
 
 function updateProgress() {
@@ -216,6 +212,28 @@ window.onScene3DReady(function onScene3DReadyHidePart1Indicator() {
   if (part1LoadingEl) part1LoadingEl.classList.add('hidden');
 });
 
+// Indicateur du grenier (partie 2) : visible dès que l'écran de chargement s'efface
+// si le modèle 3D n'est pas encore prêt, masqué dès que la scène est rendue.
+const part2LoadingEl = document.getElementById('part2-loading');
+
+function setPart2LoadingMessage(message) {
+  if (!part2LoadingEl) return;
+  const label = part2LoadingEl.querySelector('.part2-loading-label');
+  if (label && message) label.textContent = message;
+  part2LoadingEl.classList.remove('hidden');
+}
+
+if (typeof window.onScene3DPart2CanvasReady === 'function') {
+  window.onScene3DPart2CanvasReady(() => {
+    if (part2LoadingEl) part2LoadingEl.classList.add('hidden');
+  });
+}
+
+window.onScene3DPart2Error = function onScene3DPart2Error(err) {
+  console.error('Échec du chargement de scene-partie2.glb :', err);
+  setPart2LoadingMessage('le grenier n\u2019a pas pu se charger. recharge la page.');
+};
+
 function preloadImage(src) {
   return new Promise((resolve) => {
     const img = new Image();
@@ -223,17 +241,6 @@ function preloadImage(src) {
     img.onerror = resolve;
     img.src = src;
   });
-}
-
-function onLoadingComplete() {
-  setTimeout(() => {
-    loadingScreen.classList.add('fade-out');
-    // Aller directement à la partie 2 (sans experience ni animation de révélation)
-    transitionToScene3D();
-    loadingScreen.addEventListener('transitionend', () => {
-      loadingScreen.remove();
-    }, { once: true });
-  }, 300);
 }
 
 function easeOutCubic(t) {
@@ -274,7 +281,11 @@ function playRevealAnimation() {
 // Exposer la fonction sur window pour qu'elle soit accessible depuis goToPart1
 window.playRevealAnimation = playRevealAnimation;
 
+let experienceRevealed = false;
+
 function transitionToScene3D() {
+  if (experienceRevealed) return;
+  experienceRevealed = true;
   // Afficher la partie 2 d'abord (au lieu de la partie 1)
   scene3dPart2.hidden = false;
   scene3dPart2.classList.add('visible');
@@ -282,9 +293,25 @@ function transitionToScene3D() {
   tryPlayEntranceSound();
   if (typeof window.startScene3DPart2 === 'function') {
     window.startScene3DPart2();
+  } else {
+    // Le module scene3d-part2 (et le téléchargement du GLB) est encore en cours :
+    // on démarre la partie 2 dès qu'il est prêt.
+    const pollStart = setInterval(() => {
+      if (typeof window.startScene3DPart2 === 'function') {
+        clearInterval(pollStart);
+        window.startScene3DPart2();
+      }
+    }, 100);
   }
   window.addEventListener('scroll', hideScrollHint, { once: true, passive: true });
 }
+
+// Appelé par boot.js (qui gère l'écran de chargement de façon indépendante des
+// modules CDN) dès que la page est prête — ou au plus tard après son filet de
+// sécurité — pour révéler l'expérience (partie 2 + démarrage du grenier).
+window.revealExperience = function revealExperience() {
+  transitionToScene3D();
+};
 
 function hideScrollHint() {
   scrollHint.classList.remove('visible');
@@ -300,6 +327,7 @@ ASSETS_TO_PRELOAD.forEach((src) => {
 
 function waitForScene3DPart2Ready() {
   if (typeof window.onScene3DPart2Ready === 'function') {
+    refreshProgressBar();
     window.onScene3DPart2Ready(() => {
       glbReady = true;
       glbProgress = 1;
