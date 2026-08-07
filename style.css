@@ -981,7 +981,32 @@ body {
 
 @media (max-width: 700px) {
   .stage-nav-btn {
-    padding: 12px 22px;
-    font-size: 14px;
+    left: 16px;
+    transform: none;
+    padding: 11px 18px;
+    font-size: 13px;
+  }
+
+  .stage-nav-btn:hover {
+    transform: translateY(-2px);
+  }
+
+  .stage-nav-btn:active {
+    transform: translateY(0);
+  }
+
+  /* Bouton AR réduit sur petit écran pour éviter tout chevauchement */
+  .ar-button {
+    bottom: 16px;
+    right: 16px;
+    padding: 8px 12px;
+    gap: 6px;
+    border-radius: 12px;
+    font-size: 11px;
+  }
+
+  .ar-icon {
+    width: 26px;
+    height: 26px;
   }
 }
