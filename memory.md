@@ -14,7 +14,7 @@ Faire fonctionner entièrement le voyage partie 2 → partie 1 sur « Le cœur d
   - `CameraAction` (scene-bananin.glb) : translation animée 178 keyframes (0→8,125 s), la caméra recule x=-3,57 → -12,82 pendant le scroll ; rotation constante = pose du nœud (quat [-0.0674, -0.7039, -0.0674, 0.7039], regard ≈ +X, légèrement vers le bas) ; scale=1. Pose caméra PC : (-3.567, 3.135, -1.632), FOV 22,9° ; mobile (scene-bananin-mobile.glb) : (8.842, 0, 0), FOV 39,6°.
   - **Comportement mesuré (readPixels WebGL réel)** : au démarrage (scroll 0) le canvas 3D est quasi vide (~1,5 % opaque — caméra au bord du modèle, FOV étroit) ; à mi-scroll le village remplit l'écran (100 %, 186 couleurs). C'est le choix assumé de l'utilisateur (il corrigera la pose dans le GLB/Blender plus tard si besoin).
 - Côté détection du clic : `setupPlaneButton` utilise `pointerdown/pointerup` (seuil mouvement <10 px) + `isPlaneHit` = raycast sphère `PLANE_HIT_RADIUS=1.5` autour du worldPos du plane. Valide.
-- Les `.glb` : partie 1 `asset/model/scene-bananin.glb` (desktop, 1 880 404 octets, path mobile `scene-bananin-mobile.glb` sous 700 px) ; partie 2 `scene-partie2.glb` (5,7 Mo) ; draco dans `libs/draco/` (`draco_decoder.wasm` + `draco_wasm_wrapper.js`).
+- Les `.glb` : partie 1 `asset/model/scene-bananin.glb` (desktop, 1 880 404 octets, path mobile `scene-bananin-mobile.glb` sous 700 px) ; partie 2 `asset/model/SCENE_1.glb` (2,79 Mo, remplace l'ancien `scene-partie2.glb` de 5,7 Mo) ; draco dans `libs/draco/` (`draco_decoder.wasm` + `draco_wasm_wrapper.js`).
 
 ## Work State
 ### Completed

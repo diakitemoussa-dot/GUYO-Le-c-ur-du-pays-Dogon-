@@ -230,7 +230,7 @@ if (typeof window.onScene3DPart2CanvasReady === 'function') {
 }
 
 window.onScene3DPart2Error = function onScene3DPart2Error(err) {
-  console.error('Échec du chargement de scene-partie2.glb :', err);
+  console.error('Échec du chargement de SCENE_1.glb :', err);
   setPart2LoadingMessage('le grenier n\u2019a pas pu se charger. recharge la page.');
 };
 

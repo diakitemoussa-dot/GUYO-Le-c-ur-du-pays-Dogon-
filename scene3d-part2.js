@@ -797,7 +797,7 @@ window.onScene3DPart2CanvasReady = function onScene3DPart2CanvasReady(callback) 
 };
 
 loader.load(
-  'asset/model/scene-partie2.glb',
+  'asset/model/SCENE_1.glb',
   (gltf) => {
     loadedGltf = gltf;
     if (part2ReadyCallback) part2ReadyCallback();
@@ -808,7 +808,7 @@ loader.load(
     }
   },
   (error) => {
-    console.error('Échec du chargement de scene-partie2.glb :', error);
+    console.error('Échec du chargement de SCENE_1.glb :', error);
     if (typeof window.onScene3DPart2Error === 'function') {
       window.onScene3DPart2Error(error);
     }
