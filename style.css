@@ -857,7 +857,18 @@ body {
     font-size: clamp(1.6rem, 4vw, 2.4rem);
   }
 
-  .ar-incompatibility-ok-btn {
+.ar-incompatibility-detail {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: clamp(0.95rem, 2.5vw, 1.3rem);
+  color: #6b5273;
+  line-height: 1.5;
+  margin: 0;
+  max-width: 34ch;
+  opacity: 0;
+  animation: fadeInUp 0.8s ease 0.5s forwards;
+}
+
+.ar-incompatibility-ok-btn {
     padding: 14px 40px;
     font-size: 18px;
     letter-spacing: 1px;

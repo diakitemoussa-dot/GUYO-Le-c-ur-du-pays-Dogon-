@@ -403,18 +403,72 @@ dogoBtn.addEventListener('click', () => {
   console.log('Bouton Dôgo kun soro cliqué !');
 });
 
-// Bouton AR - Réalité augmentée native (iOS Quick Look / Android Scene Viewer via <model-viewer>)
+// Bouton AR - Réalité augmentée native (iOS Quick Look / WebXR Android via <model-viewer>)
 const arButton = document.getElementById('ar-button');
 const arViewer = document.getElementById('ar-viewer');
 const arIncompatibilityScreen = document.getElementById('ar-incompatibility-screen');
 const arIncompatibilityBtn = document.getElementById('ar-incompatibility-btn');
+const arIncompatibilityDetail = document.getElementById('ar-incompatibility-detail');
+const arLoading = document.getElementById('ar-loading');
+
+function showARIncompatibility(detail) {
+  if (arIncompatibilityDetail) {
+    arIncompatibilityDetail.textContent = detail || '';
+  }
+  arIncompatibilityScreen.classList.remove('hidden');
+  arIncompatibilityScreen.classList.add('visible');
+}
+
+function showARLoading() {
+  if (arLoading) arLoading.classList.remove('hidden');
+}
+
+function hideARLoading() {
+  if (arLoading) arLoading.classList.add('hidden');
+}
+
+function isIOS() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
+// Détection fiable du support AR AVANT de laisser model-viewer décider.
+// - 'webxr' uniquement si le navigateur déclare vraiment « immersive-ar » (ARCore) :
+//   ainsi jamais de boucle « autoriser la caméra » sur un téléphone sans ARCore.
+// - 'quick-look' sur iOS Safari (l'export USDZ à la volée fonctionne déjà).
+// On ne choisit JAMAIS scene-viewer automatiquement : sur un Android sans ARCore,
+// model-viewer 3.4.0 retombe sur une intent échouée puis appelle history.back(),
+// ce qui renvoie l'utilisateur au début de l'expérience.
+async function detectARMode() {
+  if (!self.isSecureContext) return null; // WebXR exige HTTPS
+  if (isIOS()) return 'quick-look';
+  if (navigator.xr && typeof navigator.xr.isSessionSupported === 'function') {
+    try {
+      if (await navigator.xr.isSessionSupported('immersive-ar')) {
+        return 'webxr';
+      }
+    } catch (e) {
+      // Support API présent mais réponse impossible : on retombe sur null.
+    }
+  }
+  return null;
+}
+
+function getARIncompatibilityReason() {
+  if (!self.isSecureContext) {
+    return 'la réalité augmentée nécessite une connexion HTTPS sécurisée.';
+  }
+  if (/android/i.test(navigator.userAgent)) {
+    return 'pour la réalité augmentée sur Android : installe « Google Play Services for AR » (ARCore) et utilise Google Chrome.';
+  }
+  return 'essaye depuis un téléphone récent (iPhone/iPad avec Safari, ou Android avec Google Chrome).';
+}
 
 function tryActivateAR() {
   if (arViewer.canActivateAR) {
     arViewer.activateAR();
   } else {
-    arIncompatibilityScreen.classList.remove('hidden');
-    arIncompatibilityScreen.classList.add('visible');
+    showARIncompatibility(getARIncompatibilityReason());
   }
 }
 
@@ -444,31 +498,62 @@ function ensureModelViewerLoaded() {
 
 arButton.addEventListener('click', async () => {
   if (!arViewer) return;
+  arButton.disabled = true;
+
+  // Choisir le mode AR soi-même, avant tout chargement, pour ne jamais laisser
+  // model-viewer basculer en scene-viewer (qui renvoie au début de l'expérience
+  // sur les Android sans ARCore) ni tenter webxr sans ARCore (boucle caméra).
+  const mode = await detectARMode();
+  if (!mode) {
+    arButton.disabled = false;
+    showARIncompatibility(getARIncompatibilityReason());
+    return;
+  }
+  arViewer.setAttribute('ar-modes', mode);
+
   try {
     await ensureModelViewerLoaded();
   } catch (e) {
-    arIncompatibilityScreen.classList.remove('hidden');
-    arIncompatibilityScreen.classList.add('visible');
+    arButton.disabled = false;
+    showARIncompatibility('le module de réalité augmentée n\u2019a pas pu être chargé (vérifie ta connexion internet).');
     return;
   }
+
   // Le modèle n'est chargé dans <model-viewer> qu'à ce moment précis, pas au
   // chargement de la page : Three.js charge déjà ce même fichier pour afficher la
   // scène, le charger une 2e fois en arrière-plan dès le départ doublait la bande
   // passante nécessaire et bloquait l'écran de chargement.
   // (le setter .src de <model-viewer> ne reflète pas l'attribut HTML, d'où ce flag)
+  const activateWhenReady = () => {
+    // Une fois le modèle chargé, déclencher toutes les animations puis l'AR.
+    playAllARAnimations();
+    tryActivateAR();
+    arButton.disabled = false;
+    hideARLoading();
+  };
+
+  const onLoadError = () => {
+    arButton.disabled = false;
+    hideARLoading();
+    arModelRequested = false; // autoriser une nouvelle tentative au prochain clic
+    showARIncompatibility('le modèle 3D n\u2019a pas pu être chargé pour la réalité augmentée.');
+  };
+
   if (!arModelRequested) {
     arModelRequested = true;
+    showARLoading();
     // canActivateAR (notamment la génération du USDZ pour Quick Look sur iOS)
     // n'est fiable qu'une fois le modèle chargé, donc on attend 'load' avant
     // de tenter l'activation la première fois.
-    arViewer.addEventListener('load', () => {
-      // Une fois le modèle chargé, déclencher toutes les animations
-      playAllARAnimations();
-      tryActivateAR();
-    }, { once: true });
+    arViewer.addEventListener('load', activateWhenReady, { once: true });
+    arViewer.addEventListener('error', onLoadError, { once: true });
     arViewer.src = 'asset/model/le_guyo_AR.glb';
+  } else if (arViewer.loaded) {
+    activateWhenReady();
   } else {
-    tryActivateAR();
+    // Modèle déjà en cours de chargement : patienter sans relancer un 2e load.
+    showARLoading();
+    arViewer.addEventListener('load', activateWhenReady, { once: true });
   }
 });
 
