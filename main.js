@@ -438,24 +438,28 @@ function isIOS() {
 // AR démarre puis le navigateur plante, alors que l'app Scene Viewer fonctionne.
 // On les dirige donc vers scene-viewer, jamais vers webxr.
 function isSamsung() {
-  return /SamsungBrowser|SM-[A-Z0-9]{2,}|SGH-[A-Z0-9]{3}|GT-[A-Z0-9]{3}|SCV\d{2}|SC-\d{2}[A-Z]/i.test(navigator.userAgent);
+  return /Samsung|SM-[A-Z0-9]{2,}|SGH-[A-Z0-9]{3}|GT-[A-Z0-9]{3}|SCV\d{2}|SC-\d{2}[A-Z]/i.test(navigator.userAgent);
 }
 
 // Détection fiable du support AR AVANT de laisser model-viewer décider.
-// - 'webxr' uniquement si le navigateur déclare vraiment « immersive-ar » (ARCore) :
-//   ainsi jamais de boucle « autoriser la caméra » sur un téléphone sans ARCore.
-// - 'scene-viewer' sur Samsung (avec ARCore) : WebXR y plante, Scene Viewer non.
 // - 'quick-look' sur iOS Safari (l'export USDZ à la volée fonctionne déjà).
-// On ne choisit JAMAIS scene-viewer sur un Android sans ARCore : model-viewer 3.4.0
-// retomberait sur une intent échouée puis appellerait history.back(), ce qui renvoie
-// l'utilisateur au début de l'expérience.
+// - 'scene-viewer' sur TOUT Samsung : WebXR y est peu fiable (plante, ou répond
+//   « non supporté » alors que ARCore est présent), Scene Viewer fonctionne dès
+//   que ARCore est là. On ne consulte donc JAMAIS WebXR pour décider d'un Samsung.
+// - 'webxr' sur les autres Android uniquement si le navigateur déclare vraiment
+//   « immersive-ar » (ARCore) : ainsi jamais de boucle « autoriser la caméra »
+//   sur un Android sans ARCore.
+// On ne choisit JAMAIS scene-viewer sur un Android non-Samsung sans ARCore :
+// model-viewer 3.4.0 retomberait sur une intent échouée puis appellerait
+// history.back(), ce qui renvoie l'utilisateur au début de l'expérience.
 async function detectARMode() {
   if (!self.isSecureContext) return null; // WebXR exige HTTPS
   if (isIOS()) return 'quick-look';
+  if (isSamsung()) return 'scene-viewer';
   if (navigator.xr && typeof navigator.xr.isSessionSupported === 'function') {
     try {
       if (await navigator.xr.isSessionSupported('immersive-ar')) {
-        return isSamsung() ? 'scene-viewer' : 'webxr';
+        return 'webxr';
       }
     } catch (e) {
       // Support API présent mais réponse impossible : on retombe sur null.
