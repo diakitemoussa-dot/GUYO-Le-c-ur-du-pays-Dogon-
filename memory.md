@@ -16,6 +16,7 @@ Faire fonctionner entièrement le voyage partie 2 → partie 1 sur « Le cœur d
   - **Comportement mesuré (readPixels WebGL réel)** : au démarrage (scroll 0) le canvas 3D est quasi vide (~1,5 % opaque — caméra au bord du modèle, FOV étroit) ; à mi-scroll le village remplit l'écran (100 %, 186 couleurs). C'est le choix assumé de l'utilisateur (il corrigera la pose dans le GLB/Blender plus tard si besoin).
 - Côté détection du clic : `setupPlaneButton` utilise `pointerdown/pointerup` (seuil mouvement <10 px) + `isPlaneHit` = raycast sphère `PLANE_HIT_RADIUS=1.5` autour du worldPos du plane. Valide.
 - Les `.glb` : partie 1 `asset/model/scene-bananin.glb` (desktop, 1 880 404 octets, path mobile `scene-bananin-mobile.glb` sous 700 px) ; partie 2 `asset/model/SCENE_1.glb` (2,79 Mo, remplace l'ancien `scene-partie2.glb` de 5,7 Mo) ; draco dans `libs/draco/` (`draco_decoder.wasm` + `draco_wasm_wrapper.js`).
+- **AR Samsung vs iPhone (`main.js`)** : sur Samsung, WebXR (« immersive-ar ») plante le navigateur (bug pilote ANGLE/Exynos, cf. issues model-viewer #3495/#4661/#4665) alors que l'app Scene Viewer fonctionne. `detectARMode()` → `isSamsung()` (UA `SM-…`, `GT-…`, `SGH-…`, `SamsungBrowser`, `SCV`/`SC-…`) : sur Samsung AVEC ARCore (`isSessionSupported('immersive-ar')` vrai) on renvoie `scene-viewer` (jamais webxr) ; sur les autres Android ARCore → `webxr` ; iOS → `quick-look`. `tryActivateAR()` est enveloppé de try/catch → un échec d'activation affiche l'écran d'incompatibilité au lieu de planter la page.
 
 ## Work State
 ### Completed
