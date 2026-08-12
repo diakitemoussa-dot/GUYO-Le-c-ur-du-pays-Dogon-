@@ -432,39 +432,23 @@ function isIOS() {
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 }
 
-// Repère les appareils Samsung (Galaxy SM-…, GT-…, SGH-…, Samsung Internet, etc.).
-// WebXR (« immersive-ar ») est cassé ou instable sur beaucoup de Samsung (bug du
-// pilote GPU ANGLE/Exynos, cf. issues model-viewer #3495/#4661/#4665) : la session
-// AR démarre puis le navigateur plante, alors que l'app Scene Viewer fonctionne.
-// On les dirige donc vers scene-viewer, jamais vers webxr.
-function isSamsung() {
-  return /Samsung|SM-[A-Z0-9]{2,}|SGH-[A-Z0-9]{3}|GT-[A-Z0-9]{3}|SCV\d{2}|SC-\d{2}[A-Z]/i.test(navigator.userAgent);
-}
-
-// Détection fiable du support AR AVANT de laisser model-viewer décider.
+// Choix du mode AR, AVANT de laisser model-viewer décider :
 // - 'quick-look' sur iOS Safari (l'export USDZ à la volée fonctionne déjà).
-// - 'scene-viewer' sur TOUT Samsung : WebXR y est peu fiable (plante, ou répond
-//   « non supporté » alors que ARCore est présent), Scene Viewer fonctionne dès
-//   que ARCore est là. On ne consulte donc JAMAIS WebXR pour décider d'un Samsung.
-// - 'webxr' sur les autres Android uniquement si le navigateur déclare vraiment
-//   « immersive-ar » (ARCore) : ainsi jamais de boucle « autoriser la caméra »
-//   sur un Android sans ARCore.
-// On ne choisit JAMAIS scene-viewer sur un Android non-Samsung sans ARCore :
-// model-viewer 3.4.0 retomberait sur une intent échouée puis appellerait
-// history.back(), ce qui renvoie l'utilisateur au début de l'expérience.
+// - 'scene-viewer' sur TOUT Android : l'app native Scene Viewer (ARCore) est la
+//   seule voie fiable. WebXR (« immersive-ar ») est instable sur beaucoup
+//   d'appareils (Samsung/Exynos : plante — issues model-viewer #3495/#4661/#4665 —
+//   mais aussi rame ou répond « non supporté » alors qu'ARCore est présent).
+//   L'intent Scene Viewer ouvre l'app ARCore directement : pas de WebGL dans la
+//   page, pas de lag, et marche dès qu'ARCore est installé.
+// - On ne consulte donc JAMAIS navigator.xr.isSessionSupported pour décider :
+//   son verdict est trompeur sur Android (faux négatifs ET faux positifs).
+// Si l'intent Scene Viewer échoue (Android sans ARCore), notre hashchange gère
+// l'écran d'incompatibilité à la place du history.back() de model-viewer (qui
+// renvoyait l'utilisateur au début de l'expérience).
 async function detectARMode() {
-  if (!self.isSecureContext) return null; // WebXR exige HTTPS
+  if (!self.isSecureContext) return null; // AR et intents exigent HTTPS
   if (isIOS()) return 'quick-look';
-  if (isSamsung()) return 'scene-viewer';
-  if (navigator.xr && typeof navigator.xr.isSessionSupported === 'function') {
-    try {
-      if (await navigator.xr.isSessionSupported('immersive-ar')) {
-        return 'webxr';
-      }
-    } catch (e) {
-      // Support API présent mais réponse impossible : on retombe sur null.
-    }
-  }
+  if (/android/i.test(navigator.userAgent)) return 'scene-viewer';
   return null;
 }
 
@@ -473,7 +457,7 @@ function getARIncompatibilityReason() {
     return 'la réalité augmentée nécessite une connexion HTTPS sécurisée.';
   }
   if (/android/i.test(navigator.userAgent)) {
-    return 'pour la réalité augmentée sur Android : installe « Google Play Services for AR » (ARCore) et utilise Google Chrome.';
+    return 'pour la réalité augmentée sur Android : installe « Google Play Services for AR » (ARCore) sur ton appareil, puis réessaie.';
   }
   return 'essaye depuis un téléphone récent (iPhone/iPad avec Safari, ou Android avec Google Chrome).';
 }
@@ -493,9 +477,57 @@ function tryActivateAR() {
 
 let arModelRequested = false;
 
+// Hash utilisé par browser_fallback_url pour détecter l'échec de l'intent
+// Scene Viewer (Android sans ARCore) et afficher l'écran d'incompatibilité
+// au lieu du history.back() de model-viewer.
+const AR_SCENE_VIEWER_FALLBACK_HASH = '#ar-not-supported';
+let arSceneViewerFallbackListener = null;
+
+// Android : ouvre l'app native Scene Viewer (ARCore) via une intent. Le modèle
+// est chargé par l'app elle-même (URL publique), donc AUCUN chargement ni WebGL
+// dans la page → lancement instantané, sans lag ni plantage WebXR.
+function launchSceneViewer() {
+  const modelUrl = new URL('asset/model/le_guyo_AR.glb', location.href).toString();
+  const fallbackUrl = location.origin + location.pathname + AR_SCENE_VIEWER_FALLBACK_HASH;
+  const params = new URLSearchParams();
+  params.set('mode', 'ar_preferred');
+  params.set('disable_occlusion', 'true');
+  params.set('file', modelUrl);
+  const intent =
+    `intent://arvr.google.com/scene-viewer/1.0?${params.toString()}` +
+    `#Intent;scheme=https;package=com.google.ar.core;` +
+    `action=android.intent.action.VIEW;` +
+    `S.browser_fallback_url=${encodeURIComponent(fallbackUrl)};end;`;
+
+  if (arSceneViewerFallbackListener) {
+    window.removeEventListener('hashchange', arSceneViewerFallbackListener);
+    arSceneViewerFallbackListener = null;
+  }
+  arSceneViewerFallbackListener = () => {
+    if (location.hash === AR_SCENE_VIEWER_FALLBACK_HASH) {
+      window.removeEventListener('hashchange', arSceneViewerFallbackListener);
+      arSceneViewerFallbackListener = null;
+      // Nettoie le hash pour ne pas ré-déclencher au prochain clic.
+      try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { /* ignore */ }
+      arButton.disabled = false;
+      hideARLoading();
+      showARIncompatibility(getARIncompatibilityReason());
+    }
+  };
+  window.addEventListener('hashchange', arSceneViewerFallbackListener);
+
+  const link = document.createElement('a');
+  link.href = intent;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
 // model-viewer (~400 Ko depuis le CDN Google) n'est PAS chargé au démarrage : il
-// n'est utile qu'au clic sur le bouton AR. L'injecter à ce moment évite un gros
-// téléchargement + une requête CDN sur le chemin critique de l'écran de chargement.
+// n'est utile qu'au clic sur le bouton AR (iOS Quick Look). L'injecter à ce
+// moment évite un gros téléchargement + une requête CDN sur le chemin critique
+// de l'écran de chargement. Sur Android on ne le charge plus du tout (Scene
+// Viewer est lancé directement par launchSceneViewer).
 let arViewerScriptPromise = null;
 function ensureModelViewerLoaded() {
   if (!arViewerScriptPromise) {
@@ -519,15 +551,27 @@ arButton.addEventListener('click', async () => {
   if (!arViewer) return;
   arButton.disabled = true;
 
-  // Choisir le mode AR soi-même, avant tout chargement, pour ne jamais laisser
-  // model-viewer basculer en scene-viewer (qui renvoie au début de l'expérience
-  // sur les Android sans ARCore) ni tenter webxr sans ARCore (boucle caméra).
   const mode = await detectARMode();
   if (!mode) {
     arButton.disabled = false;
     showARIncompatibility(getARIncompatibilityReason());
     return;
   }
+
+  // Android : lancement direct de Scene Viewer, sans model-viewer ni chargement
+  // de modèle dans la page (instantané et sans lag).
+  if (mode === 'scene-viewer') {
+    try {
+      launchSceneViewer();
+    } catch (e) {
+      console.error('Échec du lancement Scene Viewer :', e);
+      arButton.disabled = false;
+      showARIncompatibility(getARIncompatibilityReason());
+    }
+    return;
+  }
+
+  // iOS (Quick Look) : on passe par model-viewer qui génère le USDZ à la volée.
   arViewer.setAttribute('ar-modes', mode);
 
   try {
