@@ -647,6 +647,12 @@ let part1ModelLoadingStarted = false;
 const MODEL_PATH = IS_MOBILE
   ? 'asset/model/scene-bananin-mobile-optimized.glb'
   : 'asset/model/scene-bananin-optimized.glb';
+// Filet de sécurité : si le modèle optimisé échoue à charger/parsé (réseau, fichier
+// corrompu...), on retente avec la version originale. Sans ça, l'écran de chargement
+// du village resterait bloqué indéfiniment (aucun handler d'erreur n'était défini).
+const MODEL_FALLBACK_PATH = IS_MOBILE
+  ? 'asset/model/scene-bananin-mobile.glb'
+  : 'asset/model/scene-bananin.glb';
 
 const dracoLoader = new DRACOLoader();
 dracoLoader.setDecoderPath('libs/draco/');
@@ -661,18 +667,29 @@ window.startLoadingPart1Model = function startLoadingPart1Model() {
   if (part1ModelLoadingStarted) return;
   part1ModelLoadingStarted = true;
   if (window.onPart1LoadingStart) window.onPart1LoadingStart();
-  loader.load(
-    MODEL_PATH,
-    (gltf) => {
-      loadedGltf = gltf;
-      if (glbReadyCallback) glbReadyCallback();
-    },
-    (event) => {
-      if (window.onScene3DProgress && event.total) {
-        window.onScene3DProgress(event.loaded / event.total);
-      }
-    },
-  );
+
+  const attemptLoad = (url) => {
+    loader.load(
+      url,
+      (gltf) => {
+        loadedGltf = gltf;
+        if (glbReadyCallback) glbReadyCallback();
+      },
+      (event) => {
+        if (window.onScene3DProgress && event.total) {
+          window.onScene3DProgress(event.loaded / event.total);
+        }
+      },
+      (err) => {
+        console.error('Échec du chargement du modèle :', url, err);
+        if (url === MODEL_PATH) {
+          console.warn('Nouvelle tentative avec le modèle original :', MODEL_FALLBACK_PATH);
+          attemptLoad(MODEL_FALLBACK_PATH);
+        }
+      },
+    );
+  };
+  attemptLoad(MODEL_PATH);
 };
 
 window.onScene3DReady = function onScene3DReady(callback) {
