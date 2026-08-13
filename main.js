@@ -359,6 +359,30 @@ function setStageNav(stage) {
 }
 window.setStageNav = setStageNav;
 
+// Retour au grenier (partie 2) depuis l'histoire (partie 1) : utilisé par le bouton
+// « RETOUR » de l'écran de fin ET par la navigation d'étape « → le grenier ».
+// On remonte le scroll en haut, MAIS le village reste masqué pendant toute la
+// remontée (setPart1ForceHidden(true)) : l'utilisateur retombe directement sur le
+// grenier, sans jamais revoir le village. Le grenier était déjà visible (fin du
+// voyage) et le reste grâce à updateModelFade qui force setScene3DPart2Visible(true)
+// tant que le flag est actif. goToPart1 (clic sur l'avion) remettra le flag à false.
+function returnToGrenier() {
+  endChapterScreen.classList.remove('visible');
+  endChapterShown = false;
+  if (typeof window.setPart1ForceHidden === 'function') {
+    window.setPart1ForceHidden(true);
+  }
+  // Garantir que le grenier est visible immédiatement (pas d'attente d'une frame
+  // de rendu) — no-op s'il l'est déjà.
+  if (typeof window.setScene3DPart2Visible === 'function') {
+    window.setScene3DPart2Visible(true);
+  }
+  window.scrollTo(0, 0);
+  // De retour au grenier (étape 2) : réafficher la navigation d'étape.
+  stageNavBtn.classList.remove('hidden');
+  setStageNav('grenier');
+}
+
 stageNavBtn.addEventListener('click', () => {
   if (currentStage === 'grenier') {
     // Étape 2 → 1 : lancer l'histoire (même action que l'avion en papier).
@@ -366,17 +390,8 @@ stageNavBtn.addEventListener('click', () => {
       window.goToPart1();
     }
   } else {
-    // Étape 1 → 2 : revenir au grenier. On remonte d'abord en haut (le handler de
-    // scroll de scene3d.js masque la partie 2 dès que progress < 1), puis on
-    // réaffiche le grenier après que le scroll s'est stabilisé.
-    endChapterScreen.classList.remove('visible');
-    endChapterShown = false;
-    window.scrollTo(0, 0);
-    setTimeout(() => {
-      if (typeof window.setScene3DPart2Visible === 'function') {
-        window.setScene3DPart2Visible(true);
-      }
-    }, 120);
+    // Étape 1 → 2 : revenir au grenier.
+    returnToGrenier();
   }
 });
 
@@ -697,22 +712,4 @@ if (location.hash === AR_SCENE_VIEWER_FALLBACK_HASH) {
 
 // Bouton Retour - retour au grenier (partie 2) depuis l'écran de fin de chapitre
 const returnBtn = document.getElementById('return-btn');
-returnBtn.addEventListener('click', () => {
-  // Cacher l'écran de fin et revenir au début du voyage (scroll en haut).
-  endChapterScreen.classList.remove('visible');
-  window.scrollTo(0, 0);
-  endChapterShown = false;
-  // Le scroll en haut ramène la partie 1 à pleine opacité : le handler de scroll
-  // de scene3d.js masque alors la partie 2 (setScene3DPart2Visible(false) dès que
-  // progress < 1). On réaffiche donc le grenier (partie 2) APRÈS que le scroll se
-  // soit stabilisé, pour que l'utilisateur retombe dessus, prêt à recliquer sur
-  // l'avion en papier et à rejouer le voyage.
-  setTimeout(() => {
-    if (typeof window.setScene3DPart2Visible === 'function') {
-      window.setScene3DPart2Visible(true);
-    }
-  }, 120);
-  // De retour au grenier (étape 2) : réafficher la navigation d'étape.
-  stageNavBtn.classList.remove('hidden');
-  setStageNav('grenier');
-});
+returnBtn.addEventListener('click', returnToGrenier);

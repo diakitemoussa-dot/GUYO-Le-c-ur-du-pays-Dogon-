@@ -891,6 +891,11 @@ window.setScene3DPart2Visible = function setScene3DPart2Visible(visible) {
 const PART2_FADE_OUT_MS = 1200; // doit rester synchronisé avec la transition CSS de #scene3d-part2
 
 window.goToPart1 = function goToPart1() {
+  // On quitte le séjour au grenier : autoriser le village (partie 1) à redevenir
+  // visible (le flag a été mis à true par returnToGrenier au dernier retour).
+  if (typeof window.setPart1ForceHidden === 'function') {
+    window.setPart1ForceHidden(false);
+  }
   // Mettre à jour la navigation d'étape : on entre dans l'histoire (étape 1).
   if (typeof window.setStageNav === 'function') {
     window.setStageNav('story');

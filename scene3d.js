@@ -33,6 +33,16 @@ let started = false;
 let loadedGltf = null;
 let initPending = false;
 
+// Quand on revient au grenier (partie 2) via « RETOUR » ou « → le grenier », le
+// village (partie 1) doit rester complètement masqué même si le scroll remonte à
+// 0 (sinon la remontée dévoile le village sous le grenier). Ce flag est forcé à
+// true pendant tout le séjour au grenier, et remis à false dans goToPart1 (clic
+// sur l'avion en papier), seul chemin qui révèle le village.
+let part1ForceHidden = false;
+window.setPart1ForceHidden = function setPart1ForceHidden(force) {
+  part1ForceHidden = force;
+};
+
 const basePosition = new THREE.Vector3();
 const baseQuaternion = new THREE.Quaternion();
 const mouseTarget = { x: 0, y: 0 };
@@ -303,7 +313,16 @@ function createBirds() {
   }
 }
 
+// Sur mobile, redessiner les oiseaux sur canvas + réuploader leurs textures sur le
+// GPU à chaque frame coûte cher (6 uploads/frame). On limite à ~30fps : les ailes
+// battent ~1 fois par seconde, la perte de détail est imperceptible.
+let lastBirdDrawTime = 0;
+const BIRD_DRAW_INTERVAL_MS = IS_MOBILE ? 33 : 0;
+
 function updateBirds(elapsedSeconds) {
+  const now = performance.now();
+  if (BIRD_DRAW_INTERVAL_MS && now - lastBirdDrawTime < BIRD_DRAW_INTERVAL_MS) return;
+  lastBirdDrawTime = now;
   tempForward.set(0, 0, -1).applyQuaternion(baseQuaternion);
   birds.forEach((bird) => {
     const lateral = wrapRange(bird.lateralOffset + elapsedSeconds * bird.lateralSpeed, bird.range);
@@ -346,6 +365,18 @@ function onMouseMove(event) {
 
 function applyParallaxAndRender() {
   const now = performance.now();
+
+  // Grenier (partie 2) au premier plan : le village ne doit ni se rendre ni
+  // avancer son animation (le bouton « RETOUR » garde le village caché pendant
+  // la remontée du scroll). On économise tout le travail CPU/GPU de la partie 1
+  // pendant le séjour au grenier — gros gain de fluidité et d'autonomie mobile.
+  // (lastFrameTime n'est pas mis à jour : au retour dans le village, la pose
+  // resynchronise directement sur le scroll sans traîner.)
+  if (part1ForceHidden) {
+    if (typeof window.setAmbientVolume === 'function') window.setAmbientVolume(0);
+    return;
+  }
+
   updateScrollAnimation(now - lastFrameTime);
   lastFrameTime = now;
 
@@ -423,9 +454,12 @@ const MODEL_FADE_START = 0.9;
 
 function updateModelFade(progress) {
   const fadeSpan = 1 - MODEL_FADE_START;
-  const opacity = progress <= MODEL_FADE_START
+  let opacity = progress <= MODEL_FADE_START
     ? 1
     : 1 - (progress - MODEL_FADE_START) / fadeSpan;
+  // Séjour au grenier : le village reste à opacité 0 quoi qu'il arrive, et le
+  // grenier reste visible (setScene3DPart2Visible(true) plus bas).
+  if (part1ForceHidden) opacity = 0;
   modelMaterials.forEach((mat) => {
     mat.opacity = opacity;
   });
@@ -457,10 +491,15 @@ const STORY_TEXTS = [
   { id: 'story-hud-4', start: 0.715, end: 0.75, fade: 0.015 },
 ];
 
+// Les éléments DOM sont résolus une seule fois : updateStoryTexts tourne à chaque
+// frame, des getElementById répétés (10 par frame) coûtent cher sur mobile.
+const storyTextEls = STORY_TEXTS.map(({ id }) => document.getElementById(id));
+
 function updateStoryTexts(progress) {
-  STORY_TEXTS.forEach(({ id, start, end, fade }) => {
-    const el = document.getElementById(id);
-    if (!el) return;
+  for (let i = 0; i < STORY_TEXTS.length; i += 1) {
+    const el = storyTextEls[i];
+    if (!el) continue;
+    const { start, end, fade } = STORY_TEXTS[i];
     let opacity = 0;
     if (progress >= start && progress <= end) {
       const inRatio = fade > 0 ? Math.min((progress - start) / fade, 1) : 1;
@@ -468,7 +507,7 @@ function updateStoryTexts(progress) {
       opacity = Math.min(inRatio, outRatio);
     }
     el.style.opacity = opacity;
-  });
+  }
 }
 
 function setProgress(progress) {
@@ -550,7 +589,12 @@ function updateWindSpeedFromScroll() {
 // « coupures ». On pilote donc l'animation depuis la boucle de rendu (chaque frame)
 // avec un lissage exponentiel vers la position cible : la pose suit le doigt en
 // continu au lieu de sauter d'un cran à chaque event.
-const SCROLL_SMOOTHING_MS = IS_MOBILE ? 130 : 60;
+// 90ms sur mobile (au lieu de 130) : l'animation rattrape le doigt nettement plus
+// vite, ce qui rend le survol du village beaucoup plus fluide. Le lissage reste
+// utile pour absorber les à-coups résiduels du momentum, désormais plus stables
+// grâce au cache de maxScroll (l'ancienne cause de saut, la barre d'URL mobile,
+// est neutralisée par updateMaxScrollCache qui ne recalcule que sur resize).
+const SCROLL_SMOOTHING_MS = IS_MOBILE ? 90 : 60;
 let progressCurrent = 0;
 let lastAppliedProgress = -1;
 let lastFrameTime = performance.now();
@@ -594,7 +638,10 @@ function init(gltf) {
   basePosition.copy(camera.position);
   baseQuaternion.copy(camera.quaternion);
 
-  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  // Le MSAA (antialias) coûte cher en fill-rate sur les GPU mobiles. Sous 700px on
+  // le désactive : le style illustratif du village (mesh unlit, textures nettes)
+  // supporte très bien les petits crans, et on économise ~30 % du travail GPU.
+  renderer = new THREE.WebGLRenderer({ antialias: !IS_MOBILE, alpha: true });
   renderer.setClearColor(0x000000, 0);
   // Sur mobile, limiter le pixelRatio à 1.5 (au lieu de 2) : ~44 % de pixels en
   // moins à remplir, gain net de fluidité sans perte visible sur écran de téléphone.
