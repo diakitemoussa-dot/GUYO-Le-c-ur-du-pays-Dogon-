@@ -327,6 +327,7 @@ function updateBirds(elapsedSeconds) {
 // redimensionnement (onResize).
 
 function onResize() {
+  updateMaxScrollCache();
   if (!renderer) return;
   const width = window.innerWidth;
   const height = window.innerHeight;
@@ -344,6 +345,10 @@ function onMouseMove(event) {
 }
 
 function applyParallaxAndRender() {
+  const now = performance.now();
+  updateScrollAnimation(now - lastFrameTime);
+  lastFrameTime = now;
+
   updateStorySounds();
 
   // Si la souris est immobile depuis un court instant, la cible revient au centre.
@@ -482,7 +487,9 @@ function setProgress(progress) {
   // on ne remet PAS chaque clip à l'échelle de sa propre durée, sinon un objet animé
   // seulement sur une petite portion du temps semble jouer en même temps que les autres.
   actions.forEach((action) => {
-    action.time = progress * timelineDuration;
+    // On borne chaque clip à sa propre durée : la timeline globale ne doit pas
+    // rejouer en boucle les clips plus courts que le total (sinon caméra instable).
+    action.time = Math.min(progress * timelineDuration, action.getClip().duration);
   });
   mixer.update(0);
   // La pose de base reste la pose exacte de la caméra du GLB (gltf.cameras[0], qui
@@ -492,10 +499,20 @@ function setProgress(progress) {
   baseQuaternion.copy(camera.quaternion);
 }
 
+// Cache la hauteur de scroll totale, recalculée uniquement au redimensionnement.
+// Calculer innerHeight à chaque frame est instable sur mobile : quand la barre
+// d'URL disparaît en cours de scroll, innerHeight augmente et la correspondance
+// position→progression change, ce qui faisait « sauter » l'animation en pleine
+// lecture du geste.
+let maxScrollCached = 0;
+function updateMaxScrollCache() {
+  maxScrollCached = scrollSpace.offsetHeight - window.innerHeight;
+  if (maxScrollCached <= 0) maxScrollCached = 1;
+}
+
 function getScrollProgress() {
-  const maxScroll = scrollSpace.offsetHeight - window.innerHeight;
-  if (maxScroll <= 0) return 0;
-  return Math.min(Math.max(window.scrollY / maxScroll, 0), 1);
+  if (maxScrollCached <= 0) updateMaxScrollCache();
+  return Math.min(Math.max(window.scrollY / maxScrollCached, 0), 1);
 }
 
 // Vitesse de scroll normalisée (0 à 1), utilisée pour faire "souffler" le vent plus
@@ -527,16 +544,33 @@ function updateWindSpeedFromScroll() {
   }
 }
 
-let rafPending = false;
+// Lissage du scroll : sur mobile les events 'scroll' arrivent par à-coups (gros
+// sauts, momentum par à-coups) et la barre d'URL fait varier window.innerHeight
+// pendant le geste — si on accrochait l'animation à chaque event, elle jouerait en
+// « coupures ». On pilote donc l'animation depuis la boucle de rendu (chaque frame)
+// avec un lissage exponentiel vers la position cible : la pose suit le doigt en
+// continu au lieu de sauter d'un cran à chaque event.
+const SCROLL_SMOOTHING_MS = IS_MOBILE ? 130 : 60;
+let progressCurrent = 0;
+let lastAppliedProgress = -1;
+let lastFrameTime = performance.now();
+
+function updateScrollAnimation(dtMs) {
+  const target = getScrollProgress();
+  const alpha = 1 - Math.exp(-dtMs / SCROLL_SMOOTHING_MS);
+  progressCurrent += (target - progressCurrent) * alpha;
+  if (Math.abs(target - progressCurrent) < 0.0002) progressCurrent = target;
+  // On n'applique la pose que si la progression a vraiment bougé : mixer.update(0)
+  // évalue les 33 clips à chaque appel, on évite de le faire à chaque frame inutile.
+  if (Math.abs(progressCurrent - lastAppliedProgress) >= 0.0005) {
+    lastAppliedProgress = progressCurrent;
+    setProgress(progressCurrent);
+  }
+}
+
 function onScroll() {
   lastScrollEventTime = performance.now();
   updateWindSpeedFromScroll();
-  if (rafPending) return;
-  rafPending = true;
-  requestAnimationFrame(() => {
-    setProgress(getScrollProgress());
-    rafPending = false;
-  });
 }
 
 function init(gltf) {
@@ -578,6 +612,11 @@ function init(gltf) {
       const action = mixer.clipAction(clip);
       action.play();
       action.paused = true;
+      // Chaque clip a sa propre durée (export Blender) : au-delà, on MAINTIENT la
+      // dernière pose au lieu de boucler. Sans ça, les clips courts (ex. la caméra,
+      // 8s sur une timeline de 231s) bouclent plusieurs fois pendant le scroll et la
+      // vue saute/rejoue son animation → animation instable.
+      action.clampWhenFinished = true;
       return action;
     });
     timelineDuration = Math.max(...gltf.animations.map((clip) => clip.duration));
@@ -588,9 +627,13 @@ function init(gltf) {
   window.addEventListener('mousemove', onMouseMove, { passive: true });
 
   onResize();
-  setProgress(getScrollProgress());
+  updateMaxScrollCache();
+  progressCurrent = getScrollProgress();
+  lastAppliedProgress = progressCurrent;
+  setProgress(progressCurrent);
   createBirds();
   startTime = performance.now();
+  lastFrameTime = performance.now();
 
   renderer.setAnimationLoop(applyParallaxAndRender);
 }
@@ -602,8 +645,8 @@ let part1ModelLoadingStarted = false;
 // 700px on charge un modèle dédié smartphone, au-dessus le modèle PC habituel. Le
 // reste de la logique (caméra, animation, parallaxe) est identique dans les deux cas.
 const MODEL_PATH = IS_MOBILE
-  ? 'asset/model/scene-bananin-mobile.glb'
-  : 'asset/model/scene-bananin.glb';
+  ? 'asset/model/scene-bananin-mobile-optimized.glb'
+  : 'asset/model/scene-bananin-optimized.glb';
 
 const dracoLoader = new DRACOLoader();
 dracoLoader.setDecoderPath('libs/draco/');

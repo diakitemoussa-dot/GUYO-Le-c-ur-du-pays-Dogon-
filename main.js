@@ -342,9 +342,8 @@ function waitForScene3DPart2Ready() {
 }
 waitForScene3DPart2Ready();
 
-// Gestion de l'écran de fin de chapitre avec bouton "Dôgo kun soro"
+// Gestion de l'écran de fin de chapitre
 const endChapterScreen = document.getElementById('end-chapter-screen');
-const dogoBtn = document.getElementById('dogo-kun-soro-btn');
 let endChapterShown = false;
 
 // Bouton de navigation d'étape (grenier ↔ histoire), remplace l'ancienne bulle 3D :
@@ -395,12 +394,6 @@ window.addEventListener('scroll', () => {
       stageNavBtn.classList.add('hidden');
     }
   }
-});
-
-// Placeholder pour le lien du bouton (à remplir avec ton URL)
-dogoBtn.addEventListener('click', () => {
-  // window.location.href = 'URL_À_REMPLIR'; // À remplacer par le vrai lien
-  console.log('Bouton Dôgo kun soro cliqué !');
 });
 
 // Bouton AR - Réalité augmentée native (iOS Quick Look / WebXR Android via <model-viewer>)
@@ -702,7 +695,7 @@ if (location.hash === AR_SCENE_VIEWER_FALLBACK_HASH) {
   showARIncompatibility(getARIncompatibilityReason());
 }
 
-// Bouton Retour - retour au grenier (partie 2) depuis l'écran DOGOKUN SORO
+// Bouton Retour - retour au grenier (partie 2) depuis l'écran de fin de chapitre
 const returnBtn = document.getElementById('return-btn');
 returnBtn.addEventListener('click', () => {
   // Cacher l'écran de fin et revenir au début du voyage (scroll en haut).

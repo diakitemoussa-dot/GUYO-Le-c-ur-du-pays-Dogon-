@@ -487,7 +487,7 @@ body {
   height: 100%;
 }
 
-/* Écran de fin de chapitre avec bouton "Dôgo kun soro" */
+/* Écran de fin de chapitre avec logo et bouton RETOUR */
 .end-chapter-screen {
   position: fixed;
   top: 0;
@@ -507,50 +507,6 @@ body {
 .end-chapter-screen.visible {
   opacity: 1;
   pointer-events: auto;
-}
-
-.dogo-btn {
-  padding: 25px 50px;
-  font-size: 32px;
-  font-weight: 700;
-  letter-spacing: 2px;
-  color: #55415d;
-  background: transparent;
-  border: 3px solid #55415d;
-  cursor: pointer;
-  font-family: 'Orbitron', 'Share Tech Mono', monospace;
-  transition: all 0.4s ease;
-  position: relative;
-  overflow: hidden;
-  text-transform: uppercase;
-  box-shadow: 0 4px 15px rgba(85, 65, 93, 0.1);
-  line-height: 1.4;
-}
-
-.dogo-btn::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: #55415d;
-  z-index: -1;
-  transition: left 0.4s ease;
-}
-
-.dogo-btn:hover {
-  color: #f4efe6;
-  box-shadow: 0 8px 30px rgba(85, 65, 93, 0.3);
-  transform: translateY(-2px);
-}
-
-.dogo-btn:hover::before {
-  left: 0;
-}
-
-.dogo-btn:active {
-  transform: translateY(0);
 }
 
 /* Bouton Retour */
@@ -597,7 +553,7 @@ body {
   transform: translateX(0) scale(0.98);
 }
 
-/* Conteneur et logo pour "Dôgo kun soro" */
+/* Conteneur et logo de l'écran de fin de chapitre */
 .dogo-container {
   display: flex;
   flex-direction: column;
@@ -705,7 +661,7 @@ body {
   transform: scale(0.96);
 }
 
-/* Écran d'incompatibilité AR - DOGOKUN SORO style */
+/* Écran d'incompatibilité AR - même style que l'écran de fin de chapitre */
 .ar-incompatibility-screen {
   position: fixed;
   top: 0;
@@ -835,12 +791,6 @@ body {
     width: 180px;
     height: 180px;
     margin-top: -20px;
-  }
-
-  .dogo-btn {
-    padding: 16px 40px;
-    font-size: 24px;
-    letter-spacing: 1px;
   }
 
   .return-btn {

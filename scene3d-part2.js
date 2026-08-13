@@ -899,7 +899,7 @@ window.goToPart1 = function goToPart1() {
   // Sans ce retour en haut, le scroll reste où la Partie 2 l'avait laissé (fin de
   // page) et la Partie 1 est alors fondue à 0 — village, textes et audio invisibles.
   window.scrollTo(0, 0);
-  // Masquer l'écran de fin « DOGOKUN SORO » s'il était visible (fin de partie 2).
+  // Masquer l'écran de fin s'il était visible (fin de partie 2).
   const endChapterScreen = document.getElementById('end-chapter-screen');
   if (endChapterScreen) {
     endChapterScreen.classList.remove('visible');
