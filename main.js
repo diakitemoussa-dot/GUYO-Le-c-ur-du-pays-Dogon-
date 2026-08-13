@@ -432,20 +432,22 @@ function isIOS() {
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 }
 
-// Choix du mode AR, AVANT de laisser model-viewer décider :
+// Choix du mode AR, AVANT de laisser model-viewer décider. FONCTION SYNCHRONE :
+// on doit choisir et lancer l'AR dans le même geste utilisateur, sans aucun
+// await — sinon Chrome peut refuser de lancer l'app externe (pas de user
+// gesture / transient activation) et renvoie vers le browser_fallback_url,
+// d'où « appareil incompatible » à tort sur un téléphone pourtant compatible.
 // - 'quick-look' sur iOS Safari (l'export USDZ à la volée fonctionne déjà).
 // - 'scene-viewer' sur TOUT Android : l'app native Scene Viewer (ARCore) est la
 //   seule voie fiable. WebXR (« immersive-ar ») est instable sur beaucoup
 //   d'appareils (Samsung/Exynos : plante — issues model-viewer #3495/#4661/#4665 —
-//   mais aussi rame ou répond « non supporté » alors qu'ARCore est présent).
-//   L'intent Scene Viewer ouvre l'app ARCore directement : pas de WebGL dans la
-//   page, pas de lag, et marche dès qu'ARCore est installé.
+//   ou répond « non supporté » alors qu'ARCore est présent).
 // - On ne consulte donc JAMAIS navigator.xr.isSessionSupported pour décider :
 //   son verdict est trompeur sur Android (faux négatifs ET faux positifs).
 // Si l'intent Scene Viewer échoue (Android sans ARCore), notre hashchange gère
 // l'écran d'incompatibilité à la place du history.back() de model-viewer (qui
 // renvoyait l'utilisateur au début de l'expérience).
-async function detectARMode() {
+function detectARMode() {
   if (!self.isSecureContext) return null; // AR et intents exigent HTTPS
   if (isIOS()) return 'quick-look';
   if (/android/i.test(navigator.userAgent)) return 'scene-viewer';
@@ -488,7 +490,7 @@ let arSceneViewerFallbackListener = null;
 // dans la page → lancement instantané, sans lag ni plantage WebXR.
 function launchSceneViewer() {
   const modelUrl = new URL('asset/model/le_guyo_AR.glb', location.href).toString();
-  const fallbackUrl = location.origin + location.pathname + AR_SCENE_VIEWER_FALLBACK_HASH;
+  const fallbackUrl = location.origin + location.pathname + location.search + AR_SCENE_VIEWER_FALLBACK_HASH;
   const params = new URLSearchParams();
   params.set('mode', 'ar_preferred');
   params.set('disable_occlusion', 'true');
@@ -547,19 +549,22 @@ function ensureModelViewerLoaded() {
   return arViewerScriptPromise;
 }
 
-arButton.addEventListener('click', async () => {
+arButton.addEventListener('click', () => {
   if (!arViewer) return;
   arButton.disabled = true;
 
-  const mode = await detectARMode();
+  const mode = detectARMode();
   if (!mode) {
     arButton.disabled = false;
     showARIncompatibility(getARIncompatibilityReason());
     return;
   }
 
-  // Android : lancement direct de Scene Viewer, sans model-viewer ni chargement
-  // de modèle dans la page (instantané et sans lag).
+  // Android : lancement SYNCHRONE de Scene Viewer, directement dans le geste du
+  // tap. AUCUN await avant le click() de l'intent : Chrome refuse de lancer une
+  // app externe sans user gesture (transient activation) et renverrait vers le
+  // browser_fallback_url → « appareil incompatible » à tort. Aucun model-viewer
+  // ni chargement de modèle dans la page : instantané et sans lag.
   if (mode === 'scene-viewer') {
     try {
       launchSceneViewer();
@@ -567,13 +572,24 @@ arButton.addEventListener('click', async () => {
       console.error('Échec du lancement Scene Viewer :', e);
       arButton.disabled = false;
       showARIncompatibility(getARIncompatibilityReason());
+      return;
     }
+    // Si Scene Viewer s'ouvre, le bouton restera désactivé le temps de l'AR ;
+    // on le réactive quand l'app nous renvoie dans la page (ou si rien ne s'est
+    // lancé du tout).
+    arButton.disabled = false;
     return;
   }
 
   // iOS (Quick Look) : on passe par model-viewer qui génère le USDZ à la volée.
   arViewer.setAttribute('ar-modes', mode);
+  runQuickLook();
+});
 
+// Flow iOS : charger model-viewer puis le modèle, puis activer le Quick Look.
+// (Asynchrone : Quick Look iOS se lance via une navigation, pas via une intent
+// Android, la transient activation n'est pas un prérequis bloquant.)
+async function runQuickLook() {
   try {
     await ensureModelViewerLoaded();
   } catch (e) {
@@ -618,7 +634,7 @@ arButton.addEventListener('click', async () => {
     showARLoading();
     arViewer.addEventListener('load', activateWhenReady, { once: true });
   }
-});
+}
 
 // Jouer toutes les animations du modèle en boucle continue en AR
 function playAllARAnimations() {
@@ -677,6 +693,14 @@ arIncompatibilityBtn.addEventListener('click', () => {
   arIncompatibilityScreen.classList.remove('visible');
   arIncompatibilityScreen.classList.add('hidden');
 });
+
+// Si on atterrit sur #ar-not-supported, c'est que le browser_fallback_url de
+// l'intent Scene Viewer a rechargé complètement la page (URL avec query string
+// par exemple) : on affiche l'écran d'incompatibilité et on nettoie le hash.
+if (location.hash === AR_SCENE_VIEWER_FALLBACK_HASH) {
+  try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { /* ignore */ }
+  showARIncompatibility(getARIncompatibilityReason());
+}
 
 // Bouton Retour - retour au grenier (partie 2) depuis l'écran DOGOKUN SORO
 const returnBtn = document.getElementById('return-btn');
