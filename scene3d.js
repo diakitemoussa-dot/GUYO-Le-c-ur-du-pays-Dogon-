@@ -551,7 +551,7 @@ function updateMaxScrollCache() {
   if (scrollSpace && Math.abs(window.innerWidth - initialViewportWidth) > 80) {
     initialViewportWidth = window.innerWidth;
     initialViewportHeight = window.innerHeight;
-    const multiplier = window.innerWidth <= 700 ? 15 : 40;
+    const multiplier = window.SCROLL_SPACE_MULTIPLIER || 40;
     scrollSpace.style.height = `${initialViewportHeight * multiplier}px`;
   }
   maxScrollCached = (scrollSpace ? scrollSpace.offsetHeight : 0) - initialViewportHeight;
