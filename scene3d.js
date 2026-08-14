@@ -538,14 +538,23 @@ function setProgress(progress) {
   baseQuaternion.copy(camera.quaternion);
 }
 
-// Cache la hauteur de scroll totale, recalculée uniquement au redimensionnement.
-// Calculer innerHeight à chaque frame est instable sur mobile : quand la barre
-// d'URL disparaît en cours de scroll, innerHeight augmente et la correspondance
-// position→progression change, ce qui faisait « sauter » l'animation en pleine
-// lecture du geste.
+// Cache la hauteur de scroll totale.
+// Utilise une hauteur de fenêtre de référence fixe (initialViewportHeight) pour
+// ne PAS réagir au masquage de la barre d'adresse du navigateur mobile. Cela évite
+// tout saut ou décalage de la caméra 3D en cours de scroll. Seule une rotation
+// d'écran réelle (changement de largeur > 80px) recalcule la référence.
 let maxScrollCached = 0;
+let initialViewportHeight = window.innerHeight;
+let initialViewportWidth = window.innerWidth;
+
 function updateMaxScrollCache() {
-  maxScrollCached = scrollSpace.offsetHeight - window.innerHeight;
+  if (scrollSpace && Math.abs(window.innerWidth - initialViewportWidth) > 80) {
+    initialViewportWidth = window.innerWidth;
+    initialViewportHeight = window.innerHeight;
+    const multiplier = window.innerWidth <= 700 ? 15 : 40;
+    scrollSpace.style.height = `${initialViewportHeight * multiplier}px`;
+  }
+  maxScrollCached = (scrollSpace ? scrollSpace.offsetHeight : 0) - initialViewportHeight;
   if (maxScrollCached <= 0) maxScrollCached = 1;
 }
 
