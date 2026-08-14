@@ -19,9 +19,9 @@ const scrollHint = document.getElementById('scroll-hint');
 
 const DELAY_BEFORE_SCENE3D = 2000;
 // Taille de l'espace de scroll qui pilote l'animation du village (partie 1) :
-// 40 écrans sur PC, MOITIÉ sur mobile (20 écrans) — moins de swipe pour jouer
-// toute l'histoire sur téléphone. Même seuil (700px) que le choix du modèle 3D.
-const SCROLL_SPACE_MULTIPLIER = window.innerWidth <= 700 ? 20 : 40;
+// 40 écrans sur PC, 15 écrans sur mobile — moins de swipe pour jouer toute
+// l'histoire sur téléphone. Même seuil (700px) que le choix du modèle 3D.
+const SCROLL_SPACE_MULTIPLIER = window.innerWidth <= 700 ? 15 : 40;
 
 // Ambiance de vent en boucle pour la partie 1. Les navigateurs bloquent l'autoplay
 // avec son tant qu'il n'y a pas eu d'interaction utilisateur, donc on retente au
